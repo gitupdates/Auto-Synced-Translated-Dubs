@@ -8,6 +8,7 @@ import Scripts.utils as utils
 
 import configparser
 from operator import itemgetter
+from typing import Any
 import sys
 import copy
 import os
@@ -275,7 +276,7 @@ def translate_with_deepl_and_process(textList, targetLanguage, formality=None, c
     return translatedProcessedTextsList
 
 # Translate the text entries of the dictionary
-def translate_dictionary(inputSubsDict, langDict, skipTranslation=False, transcriptMode=False, forceNativeSRTOutput=False):
+def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:dict[LangDictKeys, Any], skipTranslation:bool=False, transcriptMode:bool=False, forceNativeSRTOutput:bool=False) -> dict[int, dict[str, str|int]]:
     targetLanguage = langDict[LangDictKeys.targetLanguage]
     translateService = langDict[LangDictKeys.translateService]
     formality = langDict[LangDictKeys.formality]
@@ -533,7 +534,7 @@ def download_youtube_auto_translations(languageCodeList, videoID):
     
 
 ##### Add additional info to the dictionary for each language #####
-def set_translation_info(languageBatchDict):
+def set_translation_info(languageBatchDict:dict[str, Any]) -> dict[str, dict[str, str]]:
     newBatchSettingsDict = copy.deepcopy(languageBatchDict)
 
     if config.skip_translation == True:

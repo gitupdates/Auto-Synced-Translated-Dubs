@@ -20,6 +20,7 @@ import Scripts.translate as translate
 import re
 import copy
 import asyncio
+from typing import Any
 # Import winsound if on Windows
 if os.name == 'nt':
     import winsound
@@ -36,7 +37,7 @@ import ffprobe
 #---------------------------------------- Batch File Processing ----------------------------------------
 
 # Get list of languages to process
-languageNums = batchConfig['SETTINGS']['enabled_languages'].replace(' ','').split(',')
+languageNums:list[str] = batchConfig['SETTINGS']['enabled_languages'].replace(' ','').split(',')
 srtFile = os.path.abspath(batchConfig['SETTINGS']['srt_file_path'].strip("\""))
 
 # Get original video file path, also allow you to debug using a subtitle file without having the original video file
@@ -60,7 +61,7 @@ for num in languageNums:
         raise ValueError(f'Invalid configuration in batch.ini: {num} - Make sure the option "synth_voice_gender" exists under [LANGUAGE-{num}]')    
 
 # Create a dictionary of the settings from each section
-batchSettings = {}
+batchSettings:dict[str, Any] = {}
 for num in languageNums:
 
     # Set voice model if applicable (different from voice name, only used by some services)
@@ -93,12 +94,12 @@ for num in languageNums:
 
 #======================================== Parse SRT File ================================================
 
-def parse_srt_file(srtFileLines, preTranslated=False):
+def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> dict[str, dict[str, str|int]]:
     # Matches the following example with regex:    00:00:20,130 --> 00:00:23,419
     subtitleTimeLineRegex = re.compile(r'\d\d:\d\d:\d\d,\d\d\d --> \d\d:\d\d:\d\d,\d\d\d')
 
     # Create a dictionary
-    subsDict = {}
+    subsDict:dict[str, dict[str, str|int]] = {}
 
     # Will add this many milliseconds of extra silence before and after each audio clip / spoken subtitle line
     addBufferMilliseconds = int(config.add_line_buffer_milliseconds)
@@ -156,7 +157,6 @@ def parse_srt_file(srtFileLines, preTranslated=False):
             else:
                 subsDict[line][SubsDictKeys.break_until_next] = 0
 
-
     # Apply the buffer to the start and end times by setting copying over the buffer values to main values
     if addBufferMilliseconds > 0 and not preTranslated:
         for key, value in subsDict.items():
@@ -172,11 +172,11 @@ def parse_srt_file(srtFileLines, preTranslated=False):
 with open(srtFile, 'r', encoding='utf-8-sig') as f:
     originalSubLines = f.readlines()
 
-originalLanguageSubsDict = parse_srt_file(originalSubLines)
+originalLanguageSubsDict:dict[str, dict[str, str|int]] = parse_srt_file(originalSubLines)
 
 #======================================== Get Total Duration ================================================
 # Final audio file Should equal the length of the video in milliseconds
-def get_duration(filename):
+def get_duration(filename:str) -> int:
     import subprocess, json
     result = subprocess.check_output(
             f'ffprobe -v quiet -show_streams -select_streams v:0 -of json "{filename}"', shell=True).decode()
@@ -191,9 +191,9 @@ def get_duration(filename):
 # Get the duration of the original video file
 if config.debug_mode and ORIGINAL_VIDEO_PATH.lower() == "debug.test":
     # Copy the duration based on the last timestamp of the subtitles
-    totalAudioLength = int(originalLanguageSubsDict[str(len(originalLanguageSubsDict))][SubsDictKeys.end_ms])
+    totalAudioLength:int = int(originalLanguageSubsDict[str(len(originalLanguageSubsDict))][SubsDictKeys.end_ms])
 else:
-    totalAudioLength = get_duration(ORIGINAL_VIDEO_PATH)
+    totalAudioLength:int = get_duration(ORIGINAL_VIDEO_PATH)
 
 
 #============================================= Directory Validation =====================================================
@@ -210,7 +210,7 @@ if not os.path.exists('workingFolder'):
 
 #======================================== Translation and Text-To-Speech ================================================
 
-def manually_prepare_dictionary(dictionaryToPrep):
+def manually_prepare_dictionary(dictionaryToPrep:dict[str, dict[str, str|int]]) -> dict[int, dict[str, str|int]]:
     ### Do additional Processing to match the format produced by translation function
     # Create new key 'translated_text' and set it to the value of 'text'
     for key, value in dictionaryToPrep.items():
@@ -219,7 +219,7 @@ def manually_prepare_dictionary(dictionaryToPrep):
     # Convert the keys to integers and return the dictionary
     return {int(k): v for k, v in dictionaryToPrep.items()}
 
-def get_pretranslated_subs_dict(langData):
+def get_pretranslated_subs_dict(langData:dict[str, str]) -> dict[int, dict[str, str|int]]:
     # Get list of files in the output folder
     files = os.listdir(OUTPUT_FOLDER)
     # Check if youtube-translated directory/files exist
@@ -248,20 +248,21 @@ def get_pretranslated_subs_dict(langData):
             print(f"Pre-translated file found: {file}")
 
             # Parse the srt file using function
-            preTranslatedDict = parse_srt_file(pretranslatedSubLines, preTranslated=True)
+            preTranslatedDict:dict[str, dict[str, str|int]] = parse_srt_file(pretranslatedSubLines, preTranslated=True)
 
             # Convert the keys to integers
-            preTranslatedDict = manually_prepare_dictionary(preTranslatedDict)
+            preTranslatedDictInt:dict[int, dict[str, str|int]] = {}
+            preTranslatedDictInt = manually_prepare_dictionary(preTranslatedDict)
 
             # Return the dictionary
-            return preTranslatedDict
+            return preTranslatedDictInt
         
     # If no file is found, return None
-    return None
+    return {}
 
 # Process a language: Translate, Synthesize, and Build Audio
-def process_language(langData, processedCount, totalLanguages):
-    langDict = {
+def process_language(langData:dict[str, str], processedCount:int, totalLanguages:int):
+    langDict: dict[LangDictKeys, Any] = {
         LangDictKeys.targetLanguage: langData[LangDataKeys.translation_target_language], 
         LangDictKeys.voiceName: langData[LangDataKeys.synth_voice_name], 
         LangDictKeys.languageCode: langData[LangDataKeys.synth_language_code], 
@@ -272,8 +273,9 @@ def process_language(langData, processedCount, totalLanguages):
         LangDictKeys.voiceStyle: langData[LangDataKeys.synth_voice_style]
     }
 
-    individualLanguageSubsDict = copy.deepcopy(originalLanguageSubsDict)
-
+    originalSubDictCopy:dict[str, dict[str, str|int]] = copy.deepcopy(originalLanguageSubsDict)
+    individualLanguageSubsDict:dict[int, dict[str, str|int]] = {}
+    
     # Print language being processed
     print(f"\n----- Beginning Processing of Language ({processedCount}/{totalLanguages}): {langDict[LangDictKeys.languageCode]} -----")
 
@@ -282,11 +284,11 @@ def process_language(langData, processedCount, totalLanguages):
         print("Original language is the same as the target language. Skipping translation.")
         # individualLanguageSubsDict = manually_prepare_dictionary(individualLanguageSubsDict)
         # Runs through translation function and skips translation process, but still combines subtitles and prints srt file for native language
-        individualLanguageSubsDict = translate.translate_dictionary(individualLanguageSubsDict, langDict, skipTranslation=True, forceNativeSRTOutput=True)
+        individualLanguageSubsDict = translate.translate_dictionary(originalSubDictCopy, langDict, skipTranslation=True, forceNativeSRTOutput=True)
 
     elif config.skip_translation == False:
         # Translate
-        individualLanguageSubsDict = translate.translate_dictionary(individualLanguageSubsDict, langDict, skipTranslation=config.skip_translation)
+        individualLanguageSubsDict = translate.translate_dictionary(originalSubDictCopy, langDict, skipTranslation=config.skip_translation)
         if config.stop_after_translation:
             print("Stopping at translation is enabled. Skipping TTS and building audio.")
             return
@@ -295,14 +297,14 @@ def process_language(langData, processedCount, totalLanguages):
         print("Skip translation enabled. Checking for pre-translated subtitles...")
         # Check if pre-translated subtitles exist
         pretranslatedSubsDict = get_pretranslated_subs_dict(langData)
-        if pretranslatedSubsDict != None:
+        if pretranslatedSubsDict != {}:
             individualLanguageSubsDict = pretranslatedSubsDict
         else:
             print(f"\nPre-translated subtitles not found for language '{langDict[LangDictKeys.languageCode]}' in folder '{OUTPUT_FOLDER}'. Skipping.")
             print(f"Note: Ensure the subtitle filename for this language ends with: ' - {langData[LangDataKeys.translation_target_language]}.srt'\n")
             return
 
-    # Synthesize
+    # Synthesize audio to files, and store the location of the corresponding audio file in the dictionary
     if cloudConfig.batch_tts_synthesize == True and cloudConfig.tts_service == TTSService.AZURE:
         individualLanguageSubsDict = TTS.synthesize_dictionary_batch(individualLanguageSubsDict, langDict, skipSynthesize=config.skip_synthesize)
     elif cloudConfig.tts_service == 'elevenlabs':
@@ -311,7 +313,7 @@ def process_language(langData, processedCount, totalLanguages):
         individualLanguageSubsDict = TTS.synthesize_dictionary(individualLanguageSubsDict, langDict, skipSynthesize=config.skip_synthesize)
 
     # Build audio
-    individualLanguageSubsDict = audio_builder.build_audio(individualLanguageSubsDict, langDict, totalAudioLength, config.two_pass_voice_synth)    
+    audio_builder.build_audio(individualLanguageSubsDict, langDict, totalAudioLength, config.two_pass_voice_synth)    
 
 
 #======================================== Main Program ================================================
@@ -320,13 +322,13 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Counter for number of languages processed
-processedCount = 0
-totalLanguages = len(batchSettings)
+processedCount:int = 0
+totalLanguages:int = len(batchSettings)
 
 # Process all languages
 print(f"\n----- Beginning Processing of Languages -----")
-batchSettings = translate.set_translation_info(batchSettings)
-for langNum, langData in batchSettings.items():
+batchSettingsUpdated:dict[str, dict[str, str]] = translate.set_translation_info(batchSettings)
+for langNum, langData in batchSettingsUpdated.items():
     processedCount += 1
     # Process current fallback language
     process_language(langData, processedCount, totalLanguages)

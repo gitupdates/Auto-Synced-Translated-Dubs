@@ -59,7 +59,7 @@ class LangDataKeys(str, Enum):
     synth_voice_model = "synth_voice_model"
     synth_voice_style = "synth_voice_style"
     
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
     
 class LangDictKeys(str, Enum):

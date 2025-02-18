@@ -12,6 +12,7 @@ import Scripts.TTS as TTS
 
 from pydub import AudioSegment
 from pydub.silence import detect_leading_silence
+from typing import Any
 import langcodes
 import numpy
 import subprocess
@@ -116,7 +117,7 @@ def stretch_audio_clip(audioFileToStretch, speedFactor, num):
     return AudioSegment.from_file(virtualTempAudioFile, format="wav")
 
 
-def build_audio(subsDict, langDict, totalAudioLength, twoPassVoiceSynth=False):
+def build_audio(subsDict:dict[int, dict[str, str|int]], langDict:dict[LangDictKeys, Any], totalAudioLength:int, twoPassVoiceSynth:bool=False):
     virtualTrimmedFileDict = {}
     # First trim silence off the audio files
     for key, value in subsDict.items():
@@ -250,5 +251,3 @@ def build_audio(subsDict, langDict, totalAudioLength, twoPassVoiceSynth=False):
         print("\nThere was an issue exporting the audio, it might be a permission error. The file was saved as a backup with the extension .bak")
         print("Try removing the .bak extension then listen to the file to see if it worked.\n")
         input("Press Enter to exit...")
-
-    return subsDict

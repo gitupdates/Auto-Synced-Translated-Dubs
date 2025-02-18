@@ -13,7 +13,7 @@ import re
 from urllib.request import urlopen
 import aiohttp
 import asyncio
-from typing import Optional
+from typing import Optional, Any
 
 from Scripts.shared_imports import *
 import Scripts.auth as auth
@@ -503,7 +503,7 @@ def synthesize_text_azure_batch(subsDict, langDict, skipSynthesize=False, second
     return subsDict
 
 
-def synthesize_dictionary_batch(subsDict, langDict, skipSynthesize=False, secondPass=False) -> dict:
+def synthesize_dictionary_batch(subsDict:dict[int, dict[str, str|int]], langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> dict[int, dict[str, str|int]]:
     if not skipSynthesize:
         if cloudConfig.tts_service == TTSService.AZURE:
             subsDict = synthesize_text_azure_batch(subsDict, langDict, skipSynthesize, secondPass)
@@ -513,7 +513,7 @@ def synthesize_dictionary_batch(subsDict, langDict, skipSynthesize=False, second
             exit()
     return subsDict
 
-async def synthesize_dictionary_async(subsDict, langDict, skipSynthesize=False, max_concurrent_jobs=2, secondPass=False) -> dict:
+async def synthesize_dictionary_async(subsDict:dict[int, dict[str, str|int]], langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, max_concurrent_jobs:int=2, secondPass:bool=False) -> dict[int, dict[str, str|int]]:
     semaphore = asyncio.Semaphore(max_concurrent_jobs)
     lock = asyncio.Lock()
     progress = 0
@@ -568,7 +568,7 @@ async def synthesize_dictionary_async(subsDict, langDict, skipSynthesize=False, 
     return subsDict
 
 
-def synthesize_dictionary(subsDict, langDict, skipSynthesize=False, secondPass=False) -> dict:
+def synthesize_dictionary(subsDict:dict[int, dict[str, str|int]], langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> dict[int, dict[str, str|int]]:
     for key, value in subsDict.items():
         # TTS each subtitle text, write to file, write filename into dictionary
         filePath = os.path.join('workingFolder', f'{str(key)}.mp3')
