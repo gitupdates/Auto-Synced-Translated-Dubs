@@ -305,7 +305,8 @@ def translate_dictionary(inputSubsDict, langDict, skipTranslation=False, transcr
     #     codepoints += len(text.encode("utf-8"))
       
     if skipTranslation == False:
-        maxLines = 999 
+        maxCodePoints = 9999 # Placeholder
+        maxLines = 999 # Placeholder
         # Set maxCodePoints based on translate service. This will determine the chunk size
         # Google's API limit is 30000 Utf-8 codepoints per request, while DeepL's is 130000, but we leave some room just in case
         if translateService == TranslateService.GOOGLE:

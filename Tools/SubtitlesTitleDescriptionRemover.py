@@ -92,7 +92,8 @@ def get_video_title(videoID):
             maxResults=1
         ).execute()
     except HttpError as hx:
-        print(hx)
+        print("Error trying to get video title: " + str(hx))
+        return None
 
     if results['items']:
         title = results["items"][0]["snippet"]["title"]

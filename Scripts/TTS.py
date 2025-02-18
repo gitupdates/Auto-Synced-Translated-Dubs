@@ -162,6 +162,8 @@ def synthesize_text_google(text:str, speedFactor:float, voiceName:str, voiceGend
         return response
 
     # Use try except to catch quota errors, there is a limit of 100 requests per minute for neural2 voices
+    response = None
+    decoded_audio = b''
     try:
         response = send_request(speedFactor)
     except HttpError as hx:
@@ -176,11 +178,17 @@ def synthesize_text_google(text:str, speedFactor:float, voiceName:str, voiceGend
             input("Press Enter to continue...")
     except Exception as ex:
         print("Error Message: " + str(ex))
-        input("Press Enter to continue...")
-
+        input("Press Enter to try continuing anyway...")
 
     # The response's audioContent is base64. Must decode to selected audio format
-    decoded_audio = base64.b64decode(response['audioContent'])
+    if response:
+        try:
+            decoded_audio = base64.b64decode(response['audioContent'])
+        except Exception as ex:
+            print("Error decoding audio content")
+            input("Press Enter to try continuing anyway...")
+            # Return empty bytes as declared above
+        
     return decoded_audio
 
 async def synthesize_text_elevenlabs_async_http(text:str, voiceID:str, modelID:str, apiKey:str=ELEVENLABS_API_KEY) -> Optional[bytes]:
@@ -308,6 +316,7 @@ def synthesize_text_azure_batch(subsDict, langDict, skipSynthesize=False, second
         ssmlJson:list = []
         payloadSizeInBytes:int = 0
         tempDict = dict(remainingEntriesDict) # Need to do this to avoid changing the original dict which would mess with the loop
+        payload:dict = {}
 
         for key, value in tempDict.items():
             text = tempDict[key][SubsDictKeys.translated_text]
@@ -372,18 +381,18 @@ def synthesize_text_azure_batch(subsDict, langDict, skipSynthesize=False, second
             }
             # Azure TTS Batch requests require payload must be under 500 kilobytes, so check payload is under 500,000 bytes. Not sure if they actually mean kibibytes, assume worst case.
             # Payload will be formatted as json so must account for that too by doing json.dumps(), otherwise calculated size will be inaccurate
-            payloadSizeInBytes:int = len(str(json.dumps(pendingPayload)).encode('utf-8')) 
-
-            if payloadSizeInBytes > 495000 or len(ssmlJson) > 995: # Leave some room for anything unexpected. Also number of inputs must be below 1000
-                # If payload would be too large, ignore the last entry and break out of loop
-                return payload, remainingEntriesDict
-            else:
+            payloadSizeInBytes:int = len(str(json.dumps(pendingPayload)).encode('utf-8'))
+            
+            # Until the payload is too large, do this to keep updating/remaking the final 'payload' variable
+            if payloadSizeInBytes < 495000 and len(ssmlJson) < 995: # Leave some room for anything unexpected. Also number of inputs must be below 1000
                 payload = copy.deepcopy(pendingPayload) # Must make deepycopy otherwise ssmlJson will be updated in both instead of just pendingPayload
                 # Remove entry from remainingEntriesDict if it was added to payload
-                remainingEntriesDict.pop(key)                
+                remainingEntriesDict.pop(key)
+            # If payload would be too large, ignore the last-added entry (don't do pop key), and just return the most recent previous version of the payload that was within size limits
+            else:
+                return payload, remainingEntriesDict
 
-
-        # If all the rest of the entries fit, return the payload
+        # If it reaches here, then everything fit, so return the payload
         return payload, remainingEntriesDict
     # ------------------------- End create_request_payload() -----------------------------------
 
