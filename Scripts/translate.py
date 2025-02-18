@@ -8,7 +8,7 @@ import Scripts.utils as utils
 
 import configparser
 from operator import itemgetter
-from typing import Any
+from typing import Any, Optional
 import sys
 import copy
 import os
@@ -19,20 +19,20 @@ import html
 # -------------------------------- No Translate and Manual Translation Functions -----------------------------------
 
 # Import files and put into dictionaries
-noTranslateOverrideFile = os.path.join('SSML_Customization', 'dont_translate_phrases.txt')
-dontTranslateList = utils.txt_to_list(noTranslateOverrideFile)
-manualTranslationOverrideFile = os.path.join('SSML_Customization', 'Manual_Translations.csv')
-manualTranslationsDict = utils.csv_to_dict(manualTranslationOverrideFile)
-urlListFile = os.path.join('SSML_Customization', 'url_list.txt')
-urlList = utils.txt_to_list(urlListFile)
+noTranslateOverrideFile:str = os.path.join('SSML_Customization', 'dont_translate_phrases.txt')
+dontTranslateList:list[str] = utils.txt_to_list(noTranslateOverrideFile)
+manualTranslationOverrideFile:str = os.path.join('SSML_Customization', 'Manual_Translations.csv')
+manualTranslationsDictList:list[dict[str,str]] = utils.csv_to_dictList(manualTranslationOverrideFile)
+urlListFile:str = os.path.join('SSML_Customization', 'url_list.txt')
+urlList:list[str] = utils.txt_to_list(urlListFile)
 
 # Add span tags around certain words to exclude them from being translated
-def add_notranslate_tags_from_notranslate_file(text, phraseList, customNoTranslateTag=None):
+def add_notranslate_tags_from_notranslate_file(text:str, phraseList:list[str], customNoTranslateTag:str=''):
     for word in phraseList:
         findWordRegex = rf'\b{word}\b'
         findWordRegexCompiled = regex.compile(findWordRegex, flags=re.IGNORECASE | re.UNICODE)
 
-        if not customNoTranslateTag:
+        if customNoTranslateTag == '':
             # Directly replace the word with a span tag
             text = findWordRegexCompiled.sub(rf'<span class="notranslate">{word}</span>', text)
         else:
@@ -40,22 +40,22 @@ def add_notranslate_tags_from_notranslate_file(text, phraseList, customNoTransla
             text = findWordRegexCompiled.sub(rf'<{customNoTranslateTag}>{word}</{customNoTranslateTag}>', text)
     return text
 
-def remove_notranslate_tags(text, customNoTranslateTag=None):
-    if customNoTranslateTag == None:
+def remove_notranslate_tags(text:str, customNoTranslateTag:str='') -> str:
+    if customNoTranslateTag == '':
         text = text.replace('<span class="notranslate">', '').replace('</span>', '')
     else:
         text = text.replace(f'<{customNoTranslateTag}>', '').replace(f'</{customNoTranslateTag}>', '')
     return text
 
-def add_notranslate_tags_for_manual_translations(text, langcode, customTag=None):
-    for manualTranslatedText in manualTranslationsDict:
+def add_notranslate_tags_for_manual_translations(text:str, langcode:str, customTag:str=''):
+    for manualTranslatedText in manualTranslationsDictList:
         # Only replace text if the language matches the entry in the manual translations file
         if manualTranslatedText['Language Code'] == langcode: 
             originalText = manualTranslatedText['Original Text']
             findWordRegex = rf'\b{originalText}\b'
             findWordRegexCompiled = regex.compile(findWordRegex, flags=re.IGNORECASE | re.UNICODE)
 
-            if customTag is None:
+            if customTag == '':
                 replacement = rf'<span class="notranslate">{originalText}</span>'
             else:
                 replacement = rf'<{customTag}>{originalText}</{customTag}>'
@@ -65,8 +65,8 @@ def add_notranslate_tags_for_manual_translations(text, langcode, customTag=None)
     return text
 
 # Replace certain words or phrases with their manual translation
-def replace_manual_translations(text, langcode):
-    for manualTranslatedText in manualTranslationsDict:
+def replace_manual_translations(text:str, langcode:str) -> str:
+    for manualTranslatedText in manualTranslationsDictList:
         # Only replace text if the language matches the entry in the manual translations file
         if manualTranslatedText['Language Code'] == langcode: 
             originalText = manualTranslatedText['Original Text']
@@ -79,7 +79,7 @@ def replace_manual_translations(text, langcode):
     return text
 
 
-def ends_with_sentence_terminator(text):
+def ends_with_sentence_terminator(text:str) -> bool:
     # List of sentence terminators in different languages
     sentence_terminators = [
         '.', '. ', '!', '! ', '?', '? ', '."', '." ',  # English and similar
@@ -99,13 +99,13 @@ def ends_with_sentence_terminator(text):
 # Note: This function was almost entirely written by GPT-3 after feeding it my original code and asking it to change it so it
 # would break up the text into chunks if it was too long. It appears to work
 
-def process_response_text(text, targetLanguage, customNoTranslateTag=None):
+def process_response_text(text:str, targetLanguage:str, customNoTranslateTag:str='') -> str:
     text = html.unescape(text)
     text = remove_notranslate_tags(text, customNoTranslateTag)
     text = replace_manual_translations(text, targetLanguage)
     return text
 
-def split_transcript_chunks(text, max_length=5000):
+def split_transcript_chunks(text:str, max_length:int=5000) -> list[str]:
     # Calculate the total number of utf-8 codepoints
     #totalCodepoints = len(text.encode("utf-8"))
     
@@ -113,7 +113,7 @@ def split_transcript_chunks(text, max_length=5000):
     sentences = re.split(r'(?<=[.!?])\s+', text)
     
     # Initialize a list to store the chunks of text
-    chunks = []
+    chunks:list[str] = []
     
     # Initialize a string to store a chunk of text
     chunk = ""
@@ -139,15 +139,15 @@ def split_transcript_chunks(text, max_length=5000):
     # Return the list of chunks
     return chunks
 
-def convertChunkListToCompatibleDict(chunkList):
+def convertChunkListToCompatibleDict(chunkList: list[str]) -> dict[str, dict[str, str|int]]:
     # Create dictionary with numbers as keys and chunks as values
-    chunkDict = {}
+    chunkDict:dict[str, dict[str, str|int]] = {}
     for i, chunk in enumerate(chunkList, 1):
         chunkDict[str(i)] = {SubsDictKeys.text: chunk}
     return chunkDict
 
 # Add marker custom marker tags
-def add_marker_and_convert_to_string(textList, customMarkerTag):
+def add_marker_and_convert_to_string(textList:list[str], customMarkerTag:str) -> str:
     # If no brackets already on custom marker tag, add them
     if customMarkerTag[0] != '<':
         customMarkerTag = '<' + customMarkerTag
@@ -163,7 +163,7 @@ def add_marker_and_convert_to_string(textList, customMarkerTag):
             combinedString += text + f" {customMarkerTag}"
     return combinedString
 
-def split_and_clean_marked_combined_string(originalCombinedString, customMarkerTag, removeExtraAddedTag=None):
+def split_and_clean_marked_combined_string(originalCombinedString:str, customMarkerTag:str, removeExtraAddedTag:str='') -> list[str]:
     # Fix issue where sometimes double commas or punctuation are added near tags
     punctuation = ",、.。"  # Add more comma types if needed
     escapedPunctuationChars = re.escape(punctuation)
@@ -197,7 +197,7 @@ def split_and_clean_marked_combined_string(originalCombinedString, customMarkerT
     textList = [text.strip() for text in textList]
     
     # Remove extra added tags by Google translate or other service
-    if removeExtraAddedTag:
+    if removeExtraAddedTag != '':
         textList = [text.replace(removeExtraAddedTag, '') for text in textList]
         
     # Handle blank lines. DeepL seems to do this and sometimes combines the line after the blank line
@@ -222,10 +222,10 @@ def split_and_clean_marked_combined_string(originalCombinedString, customMarkerT
     
     return textList
 
-def translate_with_google_and_process(textList, targetLanguage):
+def translate_with_google_and_process(textList:list[str], targetLanguage:str) -> list[str]:
     # Set an html tag that will be used as marker to split the text later. Must be treated as neutral by Google Cloud, which seems to only be found by trial and error
-    customMarkerTag = '<b>'
-    endingTag = '</b>'
+    customMarkerTag:str = '<b>'
+    endingTag:str = '</b>'
     
     combinedChunkTextString = add_marker_and_convert_to_string(textList, customMarkerTag=customMarkerTag)
     
@@ -240,14 +240,14 @@ def translate_with_google_and_process(textList, targetLanguage):
             #'glossaryConfig': {}
         }
     ).execute()
-    translatedTextString = response['translations'][0]['translatedText']
+    translatedTextString:str = response['translations'][0]['translatedText']
     
     # Clean and process text
-    translatedTextsList = split_and_clean_marked_combined_string(translatedTextString, customMarkerTag=customMarkerTag, removeExtraAddedTag=endingTag)
+    translatedTextsList:list[str] = split_and_clean_marked_combined_string(translatedTextString, customMarkerTag=customMarkerTag, removeExtraAddedTag=endingTag)
     translatedTextsList = [process_response_text(translatedTextsList[i], targetLanguage) for i in range(len(translatedTextsList))]
     return translatedTextsList
 
-def translate_with_deepl_and_process(textList, targetLanguage, formality=None, customNoTranslateTag='zzz'):
+def translate_with_deepl_and_process(textList:list[str], targetLanguage:str, formality:str|None=None, customNoTranslateTag:str='zzz'):
     # Create combined string of all the text in the textList, but add custom marker tags <zzz> to the end to note where the original text was split. But don't add to last line.
     # In future can possibly add information such as index to tag, such as <zzz=#>.
     combinedChunkTextString = add_marker_and_convert_to_string(textList, customMarkerTag='<xxx>')
@@ -277,28 +277,31 @@ def translate_with_deepl_and_process(textList, targetLanguage, formality=None, c
 
 # Translate the text entries of the dictionary
 def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:dict[LangDictKeys, Any], skipTranslation:bool=False, transcriptMode:bool=False, forceNativeSRTOutput:bool=False) -> dict[int, dict[str, str|int]]:
-    targetLanguage = langDict[LangDictKeys.targetLanguage]
+    targetLanguage:str = langDict[LangDictKeys.targetLanguage]
     translateService = langDict[LangDictKeys.translateService]
-    formality = langDict[LangDictKeys.formality]
+    formality:str = langDict[LangDictKeys.formality]
 
     # Create a container for all the text to be translated
-    textToTranslate = []
+    textToTranslate:list[str] = []
     
     # Set Custom Tag if supported by the translation service
+    customNoTranslateTag:str
     if translateService == TranslateService.DEEPL:
-        customNoTranslateTag = 'zzz'
+        customNoTranslateTag:str = 'zzz'
     else:
-        customNoTranslateTag = None
+        customNoTranslateTag = ''
 
     for key in inputSubsDict:
-        originalText = inputSubsDict[key][SubsDictKeys.text]
+        originalText:str = str(inputSubsDict[key][SubsDictKeys.text]) # This value should always be text, but cast to string just to satisfy strict typing since it's technically str|int
         # Add any 'notranslate' tags to the text
+        processedText:str = ''
         processedText = add_notranslate_tags_from_notranslate_file(originalText, dontTranslateList, customNoTranslateTag)
         processedText = add_notranslate_tags_from_notranslate_file(processedText, urlList, customNoTranslateTag)
         processedText = add_notranslate_tags_for_manual_translations(processedText, targetLanguage, customNoTranslateTag)
 
         # Add the text to the list of text to be translated
-        textToTranslate.append(processedText)
+        if processedText != '':
+            textToTranslate.append(processedText)
    
     #Calculate the total number of utf-8 codepoints - No longer needed, but keeping just in case
     # codepoints = 0
@@ -321,8 +324,8 @@ def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:d
             maxLines = 999999 # No such needed limit for DeepL, but set to a high number just in case
             
         # Create a list of lists - 'chunkedTexts' where each list is a 'chunk', which in itself contains a list of strings of text to be translated
-        chunkedTexts = []
-        currentChunk = []
+        chunkedTexts:list[list[str]] = []
+        currentChunk:list[str] = []
         currentCodePoints = 0
 
         for text in textToTranslate:
@@ -401,7 +404,8 @@ def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:d
 
     else:
         for key in inputSubsDict:
-            inputSubsDict[key][SubsDictKeys.translated_text] = process_response_text(inputSubsDict[key][SubsDictKeys.text], targetLanguage) # Skips translating, such as for testing
+            textToProcess:str = str(inputSubsDict[key][SubsDictKeys.text])
+            inputSubsDict[key][SubsDictKeys.translated_text] = process_response_text(textToProcess, targetLanguage) # Skips translating, such as for testing
     print("                                                  ")
     
     # If translating transcript, return the translated text
@@ -435,8 +439,8 @@ def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:d
         with open(translatedSrtFileName, 'w', encoding='utf-8-sig') as f:
             for key in combinedProcessedDict:
                 f.write(str(key) + '\n')
-                f.write(combinedProcessedDict[key][SubsDictKeys.srt_timestamps_line] + '\n')
-                f.write(combinedProcessedDict[key][SubsDictKeys.translated_text] + '\n')
+                f.write(str(combinedProcessedDict[key][SubsDictKeys.srt_timestamps_line]) + '\n')
+                f.write(str(combinedProcessedDict[key][SubsDictKeys.translated_text]) + '\n')
                 f.write('\n')
         
         # Write debug version if applicable
@@ -451,15 +455,15 @@ def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:d
             with open(DebugSrtFileName, 'w', encoding='utf-8-sig') as f:
                 for key in combinedProcessedDict:
                     f.write(str(key) + '\n')
-                    f.write(combinedProcessedDict[key][SubsDictKeys.srt_timestamps_line] + '\n')
-                    f.write(combinedProcessedDict[key][SubsDictKeys.translated_text] + '\n')
+                    f.write(str(combinedProcessedDict[key][SubsDictKeys.srt_timestamps_line]) + '\n')
+                    f.write(str(combinedProcessedDict[key][SubsDictKeys.translated_text]) + '\n')
                     f.write(f"DEBUG: duration_ms = {combinedProcessedDict[key][SubsDictKeys.duration_ms]}" + '\n')
                     f.write(f"DEBUG: char_rate = {combinedProcessedDict[key][SubsDictKeys.char_rate]}" + '\n')
                     f.write(f"DEBUG: start_ms = {combinedProcessedDict[key][SubsDictKeys.start_ms]}" + '\n')
                     f.write(f"DEBUG: end_ms = {combinedProcessedDict[key][SubsDictKeys.end_ms]}" + '\n')
                     f.write(f"DEBUG: start_ms_buffered = {combinedProcessedDict[key][SubsDictKeys.start_ms_buffered]}" + '\n')
                     f.write(f"DEBUG: end_ms_buffered = {combinedProcessedDict[key][SubsDictKeys.end_ms_buffered]}" + '\n')
-                    f.write(f"DEBUG: Number of chars = {len(combinedProcessedDict[key][SubsDictKeys.translated_text])}" + '\n')
+                    f.write(f"DEBUG: Number of chars = {len(str(combinedProcessedDict[key][SubsDictKeys.translated_text]))}" + '\n')
                     f.write('\n')
 
     # FOR TESTING - Put all translated text into single string
@@ -469,9 +473,9 @@ def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:d
     
     return combinedProcessedDict
 
-def download_youtube_auto_translations(languageCodeList, videoID):
+def download_youtube_auto_translations(languageCodeList:list[str], videoID:str):
     
-    def get_captions_list(videoID):
+    def get_captions_list(videoID:str):
         results = auth.YOUTUBE_API.captions().list( # type: ignore[reportAttributeAccessIssue]
             part="snippet",
             videoId=videoID
@@ -480,9 +484,9 @@ def download_youtube_auto_translations(languageCodeList, videoID):
     captionsTracksResponse = get_captions_list(videoID)
     
     # Find the caption ID for a specific language
-    def get_caption_id(captionsTracksResponse, desiredLanguageCode):
-        def check_code(code):
-            matchedID = None
+    def get_caption_id(captionsTracksResponse, desiredLanguageCode:str):
+        def check_code(code:str) -> Optional[str]:
+            matchedID:str|None = None
             for item in captionsTracksResponse["items"]:
                 if item["snippet"]["language"] == code:
                     matchedID = item["id"]
@@ -599,9 +603,9 @@ def set_translation_info(languageBatchDict:dict[str, Any]) -> dict[str, dict[str
 
 
 #======================================== Combine Subtitle Lines ================================================
-def combine_subtitles_advanced(inputDict, maxCharacters=200):
+def combine_subtitles_advanced(inputDict:dict[str, dict[str, str|int]], maxCharacters:int=200):
     # Set gap threshold, the maximum gap between subtitles to combine
-    gapThreshold = config.subtitle_gap_threshold_milliseconds
+    gapThreshold:int = config.subtitle_gap_threshold_milliseconds
     charRateGoal:float
     
     if (config.speech_rate_goal == 'auto'):
@@ -609,7 +613,7 @@ def combine_subtitles_advanced(inputDict, maxCharacters=200):
         totalCharacters = 0
         totalDuration = 0
         for key, value in inputDict.items():
-            totalCharacters += len(value[SubsDictKeys.translated_text])
+            totalCharacters += len(str(value[SubsDictKeys.translated_text]))
             totalDuration = int(value[SubsDictKeys.end_ms]) / 1000 # Just ends up staying as last subtitle timestamp
         
         # If the duration is zero there's a problem. Print a warning and try to continue
@@ -628,9 +632,9 @@ def combine_subtitles_advanced(inputDict, maxCharacters=200):
             charRateGoal = VariousDefaults.defaultSpeechRateGoal
     
     # Don't change this, it is not an option, it is for keeping track
-    noMorePossibleCombines = False
+    noMorePossibleCombines:bool = False
     # Convert dictionary to list of dictionaries of the values
-    entryList = []
+    entryList:list[dict[str, str|int]] = []
 
     for key, value in inputDict.items():
         value[SubsDictKeys.originalIndex] = int(key)-1
@@ -642,7 +646,7 @@ def combine_subtitles_advanced(inputDict, maxCharacters=200):
     # Convert the list back to a dictionary then return it
     return dict(enumerate(entryList, start=1))
 
-def combine_single_pass(entryListLocal, charRateGoal, gapThreshold, maxCharacters):   
+def combine_single_pass(entryListLocal:list[dict[str, str|int]], charRateGoal:float, gapThreshold:int, maxCharacters:int):   
     ## Don't change these, they are not options, they are for keeping track ##
     # Want to restart the loop if a change is made, so use this variable, otherwise break only if the end is reached
     reachedEndOfList = False
@@ -667,38 +671,38 @@ def combine_single_pass(entryListLocal, charRateGoal, gapThreshold, maxCharacter
         # Iterates through the list in order of priority, and uses that index to operate on entryListLocal
         # For loop is broken after a combination is made, so that the list can be re-sorted and re-iterated
         for progress, data in enumerate(priorityOrderedList):
-            i = data[SubsDictKeys.originalIndex]
+            i:int= int(data[SubsDictKeys.originalIndex])
             # Check if last entry, and therefore will end loop when done with this iteration
             if progress == len(priorityOrderedList) - 1:
                 reachedEndOfList = True
 
             # Check if the current entry is outside the upper and lower bounds
-            if (data[SubsDictKeys.char_rate] > charRateGoal or data[SubsDictKeys.char_rate] < charRateGoal):
+            if (float(data[SubsDictKeys.char_rate]) > charRateGoal or float(data[SubsDictKeys.char_rate]) < charRateGoal):
 
                 # Check if the entry is the first in entryListLocal, if so do not consider the previous entry
                 if data[SubsDictKeys.originalIndex] == 0:
-                    considerPrev = False
+                    considerPrev:bool = False
                 else:
-                    considerPrev = True
+                    considerPrev:bool = True
 
                 # Check if the entry is the last in entryListLocal, if so do not consider the next entry
                 if data[SubsDictKeys.originalIndex] == originalNumberOfEntries - 1:
-                    considerNext = False
+                    considerNext:bool = False
                 else:
-                    considerNext = True
+                    considerNext:bool = True
               
                 # Get the char_rate of the next and previous entries, if they exist, and calculate the difference
                 # If the diff is positive, then it is lower than the current char_rate
                 try:
-                    nextCharRate = entryListLocal[i+1][SubsDictKeys.char_rate]
-                    nextDiff = data[SubsDictKeys.char_rate] - nextCharRate
+                    nextCharRate:float|None = float(entryListLocal[i+1][SubsDictKeys.char_rate])
+                    nextDiff:float|None = float(data[SubsDictKeys.char_rate]) - nextCharRate
                 except IndexError:
                     considerNext = False
                     nextCharRate = None
                     nextDiff = None
                 try:
-                    prevCharRate = entryListLocal[i-1][SubsDictKeys.char_rate]
-                    prevDiff = data[SubsDictKeys.char_rate] - prevCharRate
+                    prevCharRate:float|None = float(entryListLocal[i-1][SubsDictKeys.char_rate])
+                    prevDiff:float|None  = float(data[SubsDictKeys.char_rate]) - prevCharRate
                 except IndexError:
                     considerPrev = False
                     prevCharRate = None
@@ -709,34 +713,35 @@ def combine_single_pass(entryListLocal, charRateGoal, gapThreshold, maxCharacter
 
             # Define functions for combining with previous or next entries - Generated with copilot, it's possible this isn't perfect
             def combine_with_next():
-                entryListLocal[i][SubsDictKeys.text] = entryListLocal[i][SubsDictKeys.text] + ' ' + entryListLocal[i+1][SubsDictKeys.text]
-                entryListLocal[i][SubsDictKeys.translated_text] = entryListLocal[i][SubsDictKeys.translated_text] + ' ' + entryListLocal[i+1][SubsDictKeys.translated_text]
+                entryListLocal[i][SubsDictKeys.text] = str(entryListLocal[i][SubsDictKeys.text]) + ' ' + str(entryListLocal[i+1][SubsDictKeys.text])
+                entryListLocal[i][SubsDictKeys.translated_text] = str(entryListLocal[i][SubsDictKeys.translated_text]) + ' ' + str(entryListLocal[i+1][SubsDictKeys.translated_text])
                 entryListLocal[i][SubsDictKeys.end_ms] = entryListLocal[i+1][SubsDictKeys.end_ms]
                 entryListLocal[i][SubsDictKeys.end_ms_buffered] = entryListLocal[i+1][SubsDictKeys.end_ms_buffered]
                 entryListLocal[i][SubsDictKeys.duration_ms] = int(entryListLocal[i+1][SubsDictKeys.end_ms]) - int(entryListLocal[i][SubsDictKeys.start_ms])
                 entryListLocal[i][SubsDictKeys.duration_ms_buffered] = int(entryListLocal[i+1][SubsDictKeys.end_ms_buffered]) - int(entryListLocal[i][SubsDictKeys.start_ms_buffered])
-                entryListLocal[i][SubsDictKeys.srt_timestamps_line] = entryListLocal[i][SubsDictKeys.srt_timestamps_line].split(' --> ')[0] + ' --> ' + entryListLocal[i+1][SubsDictKeys.srt_timestamps_line].split(' --> ')[1]
+                entryListLocal[i][SubsDictKeys.srt_timestamps_line] = str(entryListLocal[i][SubsDictKeys.srt_timestamps_line]).split(' --> ')[0] + ' --> ' + str(entryListLocal[i+1][SubsDictKeys.srt_timestamps_line]).split(' --> ')[1]
                 del entryListLocal[i+1]
 
             def combine_with_prev():
-                entryListLocal[i-1][SubsDictKeys.text] = entryListLocal[i-1][SubsDictKeys.text] + ' ' + entryListLocal[i][SubsDictKeys.text]
-                entryListLocal[i-1][SubsDictKeys.translated_text] = entryListLocal[i-1][SubsDictKeys.translated_text] + ' ' + entryListLocal[i][SubsDictKeys.translated_text]
+                entryListLocal[i-1][SubsDictKeys.text] = str(entryListLocal[i-1][SubsDictKeys.text]) + ' ' + str(entryListLocal[i][SubsDictKeys.text])
+                entryListLocal[i-1][SubsDictKeys.translated_text] = str(entryListLocal[i-1][SubsDictKeys.translated_text]) + ' ' + str(entryListLocal[i][SubsDictKeys.translated_text])
                 entryListLocal[i-1][SubsDictKeys.end_ms] = entryListLocal[i][SubsDictKeys.end_ms]
                 entryListLocal[i-1][SubsDictKeys.end_ms_buffered] = entryListLocal[i][SubsDictKeys.end_ms_buffered]
                 entryListLocal[i-1][SubsDictKeys.duration_ms] = int(entryListLocal[i][SubsDictKeys.end_ms]) - int(entryListLocal[i-1][SubsDictKeys.start_ms])
                 entryListLocal[i-1][SubsDictKeys.duration_ms_buffered] = int(entryListLocal[i][SubsDictKeys.end_ms_buffered]) - int(entryListLocal[i-1][SubsDictKeys.start_ms_buffered])
-                entryListLocal[i-1][SubsDictKeys.srt_timestamps_line] = entryListLocal[i-1][SubsDictKeys.srt_timestamps_line].split(' --> ')[0] + ' --> ' + entryListLocal[i][SubsDictKeys.srt_timestamps_line].split(' --> ')[1]
+                entryListLocal[i-1][SubsDictKeys.srt_timestamps_line] = str(entryListLocal[i-1][SubsDictKeys.srt_timestamps_line]).split(' --> ')[0] + ' --> ' + str(entryListLocal[i][SubsDictKeys.srt_timestamps_line]).split(' --> ')[1]
                 del entryListLocal[i]
-                
+            
+            thisCharRate:float = float(data[SubsDictKeys.char_rate])
             # If user has set option to increase maximum characters when speeds are extreme. Increase by various amounts depending on how extreme
             if config.increase_max_chars_for_extreme_speeds == True:
-                if data[SubsDictKeys.char_rate] > 28:
+                if thisCharRate > 28:
                     tempMaxChars = maxCharacters + 100
-                elif data[SubsDictKeys.char_rate] > 27:
+                elif thisCharRate > 27:
                     tempMaxChars = maxCharacters + 85
-                elif data[SubsDictKeys.char_rate] > 26:
+                elif thisCharRate > 26:
                     tempMaxChars = maxCharacters + 70
-                elif data[SubsDictKeys.char_rate] > 25:
+                elif thisCharRate > 25:
                     tempMaxChars = maxCharacters + 50
                 else:
                     tempMaxChars = maxCharacters
@@ -744,23 +749,23 @@ def combine_single_pass(entryListLocal, charRateGoal, gapThreshold, maxCharacter
                 tempMaxChars = maxCharacters
 
             # Choose whether to consider next and previous entries, and if neither then continue to next loop
-            if data[SubsDictKeys.char_rate] > charRateGoal:
+            if thisCharRate > charRateGoal:
                 # Check to ensure next/previous rates are lower than current rate, and the combined entry is not too long, and the gap between entries is not too large
                 # Need to add check for considerNext and considerPrev first, because if run other checks when there is no next/prev value to check, it will throw an error
-                if considerNext == False or not nextDiff or nextDiff < 0 or (entryListLocal[i][SubsDictKeys.break_until_next] >= gapThreshold) or (len(entryListLocal[i][SubsDictKeys.translated_text]) + len(entryListLocal[i+1][SubsDictKeys.translated_text]) > tempMaxChars):
+                if considerNext == False or not nextDiff or nextDiff < 0 or (int(entryListLocal[i][SubsDictKeys.break_until_next]) >= gapThreshold) or (len(str(entryListLocal[i][SubsDictKeys.translated_text])) + len(str(entryListLocal[i+1][SubsDictKeys.translated_text])) > tempMaxChars):
                     considerNext = False
                 try:
-                    if considerPrev == False or not prevDiff or prevDiff < 0 or (entryListLocal[i-1][SubsDictKeys.break_until_next] >= gapThreshold) or (len(entryListLocal[i-1][SubsDictKeys.translated_text]) + len(entryListLocal[i][SubsDictKeys.translated_text]) > tempMaxChars):
+                    if considerPrev == False or not prevDiff or prevDiff < 0 or (int(entryListLocal[i-1][SubsDictKeys.break_until_next]) >= gapThreshold) or (len(str(entryListLocal[i-1][SubsDictKeys.translated_text])) + len(str(entryListLocal[i][SubsDictKeys.translated_text])) > tempMaxChars):
                         considerPrev = False
                 except TypeError:
                     considerPrev = False
 
-            elif data[SubsDictKeys.char_rate] < charRateGoal:
+            elif thisCharRate < charRateGoal:
                 # Check to ensure next/previous rates are higher than current rate
-                if considerNext == False or not nextDiff or nextDiff > 0 or (entryListLocal[i][SubsDictKeys.break_until_next] >= gapThreshold) or (len(entryListLocal[i][SubsDictKeys.translated_text]) + len(entryListLocal[i+1][SubsDictKeys.translated_text]) > tempMaxChars):
+                if considerNext == False or not nextDiff or nextDiff > 0 or (int(entryListLocal[i][SubsDictKeys.break_until_next]) >= gapThreshold) or (len(str(entryListLocal[i][SubsDictKeys.translated_text])) + len(str(entryListLocal[i+1][SubsDictKeys.translated_text])) > tempMaxChars):
                     considerNext = False
                 try:
-                    if considerPrev == False or not prevDiff or prevDiff > 0 or (entryListLocal[i-1][SubsDictKeys.break_until_next] >= gapThreshold) or (len(entryListLocal[i-1][SubsDictKeys.translated_text]) + len(entryListLocal[i][SubsDictKeys.translated_text]) > tempMaxChars):
+                    if considerPrev == False or not prevDiff or prevDiff > 0 or (int(entryListLocal[i-1][SubsDictKeys.break_until_next]) >= gapThreshold) or (len(str(entryListLocal[i-1][SubsDictKeys.translated_text])) + len(str(entryListLocal[i][SubsDictKeys.translated_text])) > tempMaxChars):
                         considerPrev = False
                 except TypeError:
                     considerPrev = False
@@ -777,28 +782,28 @@ def combine_single_pass(entryListLocal, charRateGoal, gapThreshold, maxCharacter
             # Also will prefer to not combine such that it adds a line after a sentence terminator               
             if considerNext and considerPrev and config.prioritize_avoiding_fragmented_speech == True:
                 # If current doesn't end a sentence and next ends a sentence, combine with next
-                if not ends_with_sentence_terminator(entryListLocal[i][SubsDictKeys.translated_text]) and ends_with_sentence_terminator(entryListLocal[i+1][SubsDictKeys.translated_text]):
+                if not ends_with_sentence_terminator(str(entryListLocal[i][SubsDictKeys.translated_text])) and ends_with_sentence_terminator(str(entryListLocal[i+1][SubsDictKeys.translated_text])):
                     combine_with_next()
                     noMorePossibleCombines = False
                     break
                 # If current ends a sentence and previous doesn't, combine with previous
-                elif ends_with_sentence_terminator(entryListLocal[i][SubsDictKeys.translated_text]) and not ends_with_sentence_terminator(entryListLocal[i-1][SubsDictKeys.translated_text]):
+                elif ends_with_sentence_terminator(str(entryListLocal[i][SubsDictKeys.translated_text])) and not ends_with_sentence_terminator(str(entryListLocal[i-1][SubsDictKeys.translated_text])):
                     combine_with_prev()
                     noMorePossibleCombines = False
                     break
                 # Check if previous ends a sentence, if so combine with next, unless current also ends a sentence
-                elif ends_with_sentence_terminator(entryListLocal[i-1][SubsDictKeys.translated_text]) and not ends_with_sentence_terminator(entryListLocal[i][SubsDictKeys.translated_text]):
+                elif ends_with_sentence_terminator(str(entryListLocal[i-1][SubsDictKeys.translated_text])) and not ends_with_sentence_terminator(str(entryListLocal[i][SubsDictKeys.translated_text])):
                     combine_with_next()
                     noMorePossibleCombines = False
                     break
 
             
             # Case where char_rate is lower than goal
-            if data[SubsDictKeys.char_rate] > charRateGoal:
+            if thisCharRate > charRateGoal:
                 # If both are to be considered, then choose the one with the lower char_rate.
                 if considerNext and considerPrev:
                     # Choose lower char rate
-                    if nextDiff and (nextDiff < prevDiff):
+                    if nextDiff and prevDiff and (nextDiff < prevDiff):
                         combine_with_next()
                         noMorePossibleCombines = False
                         break
@@ -821,11 +826,11 @@ def combine_single_pass(entryListLocal, charRateGoal, gapThreshold, maxCharacter
                     continue
             
             # Case where char_rate is lower than goal
-            elif data[SubsDictKeys.char_rate] < charRateGoal:
+            elif thisCharRate < charRateGoal:
                 # If both are to be considered, then choose the one with the higher char_rate.
                 if considerNext and considerPrev:                  
                     # Choose higher char rate
-                    if nextDiff and (nextDiff > prevDiff):
+                    if nextDiff and prevDiff and (nextDiff > prevDiff):
                         combine_with_next()
                         noMorePossibleCombines = False
                         break
@@ -853,13 +858,13 @@ def combine_single_pass(entryListLocal, charRateGoal, gapThreshold, maxCharacter
 #----------------------------------------------------------------------
 
 # Calculate the number of characters per second for each subtitle entry
-def calc_dict_speaking_rates(inputDict, dictKey=SubsDictKeys.translated_text):  
+def calc_dict_speaking_rates(inputDict:list[dict[str, str|int]], dictKey:str=SubsDictKeys.translated_text):  
     tempDict = copy.deepcopy(inputDict)
     for key, value in tempDict.items():
         tempDict[key][SubsDictKeys.char_rate] = round(len(value[dictKey]) / (int(value[SubsDictKeys.duration_ms]) / 1000), 2)
     return tempDict
 
-def calc_list_speaking_rates(inputList, charRateGoal, dictKey=SubsDictKeys.translated_text): 
+def calc_list_speaking_rates(inputList:list[dict[str, str|int]], charRateGoal:float, dictKey:str=SubsDictKeys.translated_text): 
     tempList = copy.deepcopy(inputList)
     for i in range(len(tempList)):
         # Calculate the number of characters per second based on the duration of the entry

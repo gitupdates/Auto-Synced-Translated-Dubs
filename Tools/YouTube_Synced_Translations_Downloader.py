@@ -105,10 +105,10 @@ if userChoice == "single":
         
         
 elif userChoice == "batch":
-    languageCodeList = []
+    languageCodeList:list[str] = []
     # Create list of languages to translate to
     for langNum, langData in batchSettings.items():
-        langCode = langData[LangDataKeys.translation_target_language]
+        langCode:str = langData[LangDataKeys.translation_target_language]
         languageCodeList.append(langCode)
         
     # List languages to download

@@ -1,7 +1,7 @@
 import csv
 
 # Interprets a string as a boolean. Returns True or False
-def parseBool(string, silent=False):
+def parseBool(string:str|bool, silent:bool=False):
     if type(string) == str:
         if string.lower() == 'true':
             return True
@@ -20,7 +20,7 @@ def parseBool(string, silent=False):
     else:
         raise ValueError('Not a valid boolean string')
     
-def parseConfigSetting(setting):
+def parseConfigSetting(setting) -> str | int | bool:
     # Remove any quotes user may have added in config file
     setting = setting.strip("\"").strip("\'")
 
@@ -39,17 +39,17 @@ def parseConfigSetting(setting):
 
 # Returns a list of dictionaries from a csv file. Where the key is the column name and the value is the value in that column
 # The column names are set by the first row of the csv file
-def csv_to_dict(csvFilePath):
+def csv_to_dictList(csvFilePath:str) -> list[dict[str,str]]:
     with open(csvFilePath, "r", encoding='utf-8-sig') as data:
-        entriesDictsList = []
+        entriesDictsList:list[dict[str,str]] = []
         for line in csv.DictReader(data):
             entriesDictsList.append(line)
     return entriesDictsList
 
 # Returns a list of strings from a txt file. Ignores empty lines and lines that start with '#'
-def txt_to_list(txtFilePath):
+def txt_to_list(txtFilePath:str) -> list[str]:
     with open(txtFilePath, "r", encoding='utf-8-sig') as data:
-        entriesList = []
+        entriesList:list[str] = []
         for line in data:
             if line.strip() != '' and line.strip()[0] != '#':
                 entriesList.append(line.strip())
@@ -58,7 +58,7 @@ def txt_to_list(txtFilePath):
 
 # User inputs Y/N for choice, returns True or False. Takes in message to display
 # 
-def choice(message="", bypass=False, allowNone=False):  
+def choice(message:str="", bypass:bool=False, allowNone:bool=False):  
   if bypass == True:
     return True
 

@@ -90,10 +90,10 @@ def process_language(langData, processedCount, totalLanguages):
     translatedTranscriptFilePath = os.path.join(transcriptOutputDirectory, f"{filenameStem} - {langDict[LangDictKeys.targetLanguage]}.txt")
 
     # Split transcript into chunks of 5000 characters to avoid exceeding the character limits
-    transcriptChunkedList = translate.split_transcript_chunks(transcript, 5000)
+    transcriptChunkedList:list[str] = translate.split_transcript_chunks(transcript, 5000)
 
     # Need to convert the list of chunks into a compatible dictionary to be used with 'translate_dictionary' function
-    convertedDict = translate.convertChunkListToCompatibleDict(transcriptChunkedList)
+    convertedDict:dict[str, dict[str, str|int]] = translate.convertChunkListToCompatibleDict(transcriptChunkedList)
 
     # Translate the dictionary text, while processing with custom rules
     translatedDict = translate.translate_dictionary(convertedDict, langDict, transcriptMode=True)

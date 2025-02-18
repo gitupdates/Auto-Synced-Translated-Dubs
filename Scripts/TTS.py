@@ -37,16 +37,16 @@ def get_voices():
 # ======================================== Pronunciation Correction Functions ================================================
 
 interpretAsOverrideFile = os.path.join('SSML_Customization', 'interpret-as.csv')
-interpretAsEntries = utils.csv_to_dict(interpretAsOverrideFile)
+interpretAsEntries = utils.csv_to_dictList(interpretAsOverrideFile)
 
 aliasOverrideFile = os.path.join('SSML_Customization', 'aliases.csv')
-aliasEntries = utils.csv_to_dict(aliasOverrideFile)
+aliasEntries = utils.csv_to_dictList(aliasOverrideFile)
 
 urlListFile = os.path.join('SSML_Customization', 'url_list.txt')
 urlList = utils.txt_to_list(urlListFile)
 
 phonemeFile = os.path.join('SSML_Customization', 'Phoneme_Pronunciation.csv')
-phonemeEntries = utils.csv_to_dict(phonemeFile)
+phonemeEntries = utils.csv_to_dictList(phonemeFile)
 
 def add_all_pronunciation_overrides(text):
     text = add_interpretas_tags(text)
