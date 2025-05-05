@@ -9,3 +9,24 @@ test.py
 
 # Miscellaneous
 .DS_Store
+
+# Extra files
+*.log
+*.exe
+*.dll
+
+# Project Related Files
+token.pickle
+*.pickle
+*.code-workspace
+
+# Misc Project Directories
+Test*/
+Testing
+workingFolder
+Outputs
+
+# Directories
+.vscode
+.venv
+.*
