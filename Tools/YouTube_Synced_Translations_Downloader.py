@@ -18,10 +18,11 @@ else:
 sys.path.insert(1, os.getcwd())
 # ---------------------------------------------------------------------------------------
 from Scripts.shared_imports import *
-from Tools.SubtitleTrackRemover import main as remove_tracks
+from Tools.SubtitlesTitleDescriptionRemover import main as remove_tracks
 import Scripts.auth as auth
 import Scripts.translate as translate
 
+from typing import Any, Union, Optional
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 import copy
@@ -41,21 +42,21 @@ for num in languageNums:
 
 YOUTUBE_API = auth.youtube_authentication()
 
-def get_captions_list(videoID):
+def get_captions_list(videoID:str) -> dict[str, Any]:
     results = auth.YOUTUBE_API.captions().list(
         part="snippet",
         videoId=videoID
     ).execute()
     return results
 
-def print_caption_list(videoID):
+def print_caption_list(videoID:str) -> None:
     captions = get_captions_list(videoID)
     print("\nCaption tracks:")
     for index, item in enumerate(captions["items"]):
         name = item["snippet"]["name"] if not item["snippet"]["name"]=="" else "[No Track Name]"
         print(f'{index + 1}. {name} ({item["snippet"]["language"]}): {item["id"]}')
 
-def download_captions(captionID, tlang, tfmt='srt', ):
+def download_captions(captionID:str, tlang:str, tfmt:str='srt', ):
     results = auth.YOUTUBE_API.captions().download(
         id=captionID,
         tlang=tlang,
@@ -77,6 +78,7 @@ print("\nWhat do you want to do?")
 print(" 1. Download a single translated captions track")
 print(" 2. Download all translated captions tracks, based on those chosen in the batch.ini file")
 userInput = input("Enter your choice: ")
+userChoice:str = ""
 
 # Define responses
 if userInput == "1":

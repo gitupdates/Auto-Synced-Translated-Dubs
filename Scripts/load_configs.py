@@ -33,12 +33,14 @@ class CloudConfig:
     deepl_api_key: str
     azure_speech_key: str
     azure_speech_region: str
+    azure_translate_key: str
+    azure_translate_region: str
     elevenlabs_api_key: str
     elevenlabs_default_model: ElevenLabsModel
     elevenlabs_max_concurrent: int
 
     @classmethod
-    def from_dict(cls, config_dict: dict) -> 'CloudConfig':
+    def from_dict(cls, config_dict: dict[str, str]) -> 'CloudConfig':
         return cls(
             tts_service=TTSService(config_dict['tts_service']),
             translate_service=TranslateService(config_dict['translate_service']),
@@ -48,6 +50,8 @@ class CloudConfig:
             deepl_api_key=config_dict['deepl_api_key'],
             azure_speech_key=config_dict['azure_speech_key'],
             azure_speech_region=config_dict['azure_speech_region'],
+            azure_translate_key=config_dict['azure_translate_key'],
+            azure_translate_region=config_dict['azure_translate_region'],
             elevenlabs_api_key=config_dict['elevenlabs_api_key'],
             elevenlabs_default_model=ElevenLabsModel(config_dict['elevenlabs_default_model']),
             elevenlabs_max_concurrent=int(config_dict['elevenlabs_max_concurrent'])
@@ -79,7 +83,7 @@ class Config:
     youtube_autosync_languages: list[str]
 
     @classmethod
-    def from_dict(cls, config_dict: dict) -> 'Config':
+    def from_dict(cls, config_dict: dict[str,str]) -> 'Config':
         # Handle the youtube_autosync_languages list
         if isinstance(config_dict['youtube_autosync_languages'], str):
             languages = [lang.strip() for lang in config_dict['youtube_autosync_languages'].split(',')]

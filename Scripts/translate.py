@@ -473,35 +473,64 @@ def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:d
     
     return combinedProcessedDict
 
-def download_youtube_auto_translations(languageCodeList:list[str], videoID:str):
+def download_youtube_auto_translations(languageCodeList:list[str], videoID:str, getTitle:bool=False) -> None:
+    videoName:str = "[Unavailable Title]"
+    if ORIGINAL_VIDEO_NAME != "":
+        videoName = ORIGINAL_VIDEO_NAME
+        
+    if auth.YOUTUBE_API == None:
+        auth.youtube_authentication()
     
-    def get_captions_list(videoID:str):
-        results = auth.YOUTUBE_API.captions().list( # type: ignore[reportAttributeAccessIssue]
+    def get_captions_list(videoID:str)  -> dict[str,Any]:
+        results:dict[str,Any] = auth.YOUTUBE_API.captions().list( # type: ignore[reportAttributeAccessIssue]
             part="snippet",
             videoId=videoID
         ).execute()
         return results
-    captionsTracksResponse = get_captions_list(videoID)
+    
+    captionsTracksResponse:dict[str,Any] = get_captions_list(videoID)
+    
+    def get_video_title(video_id: str) -> str:
+        returnTitle:str = "[Unavailable Title]"
+        try:
+            results:dict[str,Any] = auth.YOUTUBE_API.videos().list(
+                part="snippet",
+                id=video_id,
+                fields="items/snippet/title",
+                maxResults=1
+            ).execute()
+        except Exception:
+            return "[Unavailable Title]"
+
+        if results['items']:
+            foundTitle:Optional[str] = results["items"][0]["snippet"]["title"]
+            if foundTitle:
+                returnTitle = foundTitle
+                       
+        return returnTitle
     
     # Find the caption ID for a specific language
-    def get_caption_id(captionsTracksResponse, desiredLanguageCode:str):
-        def check_code(code:str) -> Optional[str]:
+    def get_caption_id(captionsTracksResponse:dict[str,Any], desiredLanguageCode:str) -> list[str]:
+        captionIDs:list[str] = []
+        def check_code(code:str) -> list[str]:
+            matchedIDList:list[str] = []
             matchedID:str|None = None
             for item in captionsTracksResponse["items"]:
                 if item["snippet"]["language"] == code:
                     matchedID = item["id"]
-                    break
-            return matchedID
+                    if isinstance(matchedID, str):
+                        matchedIDList.append(matchedID)
+                        
+            return matchedIDList
                 
-        captionID = check_code(desiredLanguageCode)
+        captionIDs = check_code(desiredLanguageCode)
         
-        # If none found, check for two-letter code (first two letters)
-        if captionID == None:
-            captionID = check_code(desiredLanguageCode[:2])
-            
-        return captionID
+        # If none found (captionIDs is empty), try the two-letter code version instead (first two letters)
+        if len(captionIDs) == 0:
+            captionIDs = check_code(desiredLanguageCode[:2])
+        return captionIDs
       
-    def download_yt_translated_captions_track(captionID, desiredLanguageCode=None, tfmt='srt'):
+    def download_yt_translated_captions_track(videoName:str, captionID:str, desiredLanguageCode:Optional[str]=None, tfmt:str='srt', ) -> bool:
         results = auth.YOUTUBE_API.captions().download( # type: ignore[reportAttributeAccessIssue]
             id=captionID,
             tlang=desiredLanguageCode,
@@ -512,30 +541,40 @@ def download_youtube_auto_translations(languageCodeList:list[str], videoID:str):
             print("\nError: YouTube API call failed to return subtitles.")
             return False
         
-        # Make output folder if it doesn't exist
-        if not os.path.exists(OUTPUT_FOLDER):
-            os.makedirs(OUTPUT_FOLDER)
+        outputFolder:str = OUTPUT_FOLDER
+        if getTitle:
+            videoName = get_video_title(videoID)
+            outputFolder = os.path.join(OUTPUT_DIRECTORY, videoName)
         
+        # Make output folder if it doesn't exist
+        if not os.path.exists(outputFolder):
+            os.makedirs(outputFolder)
+            
         # Save captions to file. API call returns bytes in specified format
-        with open(os.path.join(OUTPUT_FOLDER, f'{ORIGINAL_VIDEO_NAME} - {desiredLanguageCode}.srt'), 'wb') as f:
+        fileNameBase:str = f'{videoName} - {desiredLanguageCode}'
+        finalFileName:str = utils.getFirstAvailableFileName(directoryPath=outputFolder, fileNameBase=fileNameBase, extension='srt')
+        
+        with open(finalFileName, 'wb') as f:
             # Write the captions bytes to file
             f.write(results)
             
         return True
     
     # Get native language caption ID
-    nativeCaptionID = get_caption_id(captionsTracksResponse, config.original_language)
+    nativeCaptionIDs:list[str] = get_caption_id(captionsTracksResponse, config.original_language)
     
     # Download the captions for each language
     for langCode in languageCodeList:
-        langCaptionID = get_caption_id(captionsTracksResponse, langCode)
+        langCaptionIDs:list[str] = get_caption_id(captionsTracksResponse, langCode)
         
         # If no matched language track, use native caption ID then auto-translate
-        if langCaptionID == None:
-            langCaptionID = nativeCaptionID
+        if len(langCaptionIDs) == 0 and len(nativeCaptionIDs) > 0:
+            langCaptionIDs = nativeCaptionIDs
         
-        download_yt_translated_captions_track(langCaptionID, langCode)
-    
+        if len(langCaptionIDs) > 0:
+            for captionID in langCaptionIDs:
+                # Download the captions for the language
+                download_yt_translated_captions_track(videoName=videoName, captionID=captionID, desiredLanguageCode=langCode)
 
 ##### Add additional info to the dictionary for each language #####
 def set_translation_info(languageBatchDict:dict[str, Any]) -> dict[str, dict[str, str]]:

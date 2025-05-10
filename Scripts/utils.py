@@ -1,5 +1,5 @@
 import csv
-
+import os
 # Interprets a string as a boolean. Returns True or False
 def parseBool(string:str|bool, silent:bool=False):
     if type(string) == str:
@@ -74,3 +74,24 @@ def choice(message:str="", bypass:bool=False, allowNone:bool=False):
       return None
     else:
       print("\nInvalid Input. Enter Y or N  --  Or enter X to return to main menu.")  
+      
+      
+def getFirstAvailableFileName(directoryPath:str, fileNameBase:str, extension:str) -> str:
+    """
+    Returns the first available file name in the directory with the given base name and extension.
+    If the file already exists, it will append a number to the base name until an available name is found.
+    """
+    # Check if directory exists
+    if not os.path.exists(directoryPath):
+        os.makedirs(directoryPath)
+
+    # Check if file already exists
+    fileName = f"{fileNameBase}.{extension}"
+    filePath = os.path.join(directoryPath, fileName)
+    i = 2
+    while os.path.exists(filePath):
+        fileName = f"{fileNameBase}_{i}.{extension}"
+        filePath = os.path.join(directoryPath, fileName)
+        i += 1
+
+    return filePath
