@@ -2,7 +2,6 @@ import json
 import base64
 import os
 import time
-import configparser
 import azure.cognitiveservices.speech as speechsdk
 from googleapiclient.errors import HttpError
 import datetime

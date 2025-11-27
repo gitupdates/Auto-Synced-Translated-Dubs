@@ -13,7 +13,7 @@ print(f"------- 'Auto Synced Translated Dubs' script by ThioJoe - Release versio
 from Scripts.shared_imports import *
 import Scripts.TTS as TTS
 import Scripts.audio_builder as audio_builder
-import Scripts.auth as auth
+#import Scripts.auth as auth
 import Scripts.translate as translate
 
 # Import built in modules
@@ -26,7 +26,7 @@ if os.name == 'nt':
     import winsound
 
 # Import other modules
-import ffprobe
+import ffprobe # pyright: ignore[reportUnusedImport] # ffprobe is used as subprocess, not sure if this module is needed
 
 # EXTERNAL REQUIREMENTS:
 # rubberband binaries: https://breakfastquay.com/rubberband/ - Put rubberband.exe and sndfile.dll in the same folder as this script

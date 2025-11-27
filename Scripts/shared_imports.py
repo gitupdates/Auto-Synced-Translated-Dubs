@@ -8,7 +8,7 @@ from typing import Any
 
 # pyright: reportConstantRedefinition=false
 
-from Scripts.utils import parseBool, parseConfigSetting
+from Scripts.utils import parseBool
 import Scripts.enums as enums
 import Scripts.types as types
 from Scripts.load_configs import config, cloudConfig

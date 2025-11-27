@@ -13,7 +13,6 @@ import uuid
 from typing import Optional
 
 import requests
-import configparser
 
 from Scripts.shared_imports import *
 

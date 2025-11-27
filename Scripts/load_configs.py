@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union, Literal
+from typing import Union
 import configparser
 
 from Scripts.enums import *

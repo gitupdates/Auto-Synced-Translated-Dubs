@@ -17,9 +17,8 @@ import os
 import sys
 import traceback
 from json import JSONDecodeError
-import configparser
 import deepl
-from typing import Any, Optional, Union, Tuple, overload, Literal
+from typing import Optional, Union, Tuple, overload, Literal
 
 # Google Cloud Globals
 token_file_name = 'token.pickle'

@@ -1,6 +1,5 @@
 import soundfile
 import pyrubberband
-import configparser
 import pathlib
 import os
 import io
@@ -14,8 +13,10 @@ from pydub import AudioSegment
 from pydub.silence import detect_leading_silence
 from typing import Any
 import langcodes
-import numpy
 import subprocess
+
+# import numpy array type for audioObj from SoundFile
+from numpy import ndarray
 
 # Set working folder
 workingFolder = "workingFolder"
@@ -96,7 +97,8 @@ def stretch_with_ffmpeg(audioInput, speed_factor):
 def stretch_audio_clip(audioFileToStretch, speedFactor, num):
     virtualTempAudioFile = io.BytesIO()
     # Write the raw string to virtualtempaudiofile
-    audioObj, sampleRate = soundfile.read(audioFileToStretch) # auddioObj is a numpy array
+    audioObj: ndarray
+    audioObj, sampleRate = soundfile.read(audioFileToStretch)  # audioObj is a numpy array
     
     # Stretch the audio using user specified method
     if config.local_audio_stretch_method == 'ffmpeg':
