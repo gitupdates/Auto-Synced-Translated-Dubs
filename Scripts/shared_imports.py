@@ -4,9 +4,13 @@ import traceback
 import configparser
 import re
 import regex
+from typing import Any
+
+# pyright: reportConstantRedefinition=false
 
 from Scripts.utils import parseBool, parseConfigSetting
 import Scripts.enums as enums
+import Scripts.types as types
 from Scripts.load_configs import config, cloudConfig
 
 batchConfig = configparser.ConfigParser()
@@ -45,10 +49,17 @@ LangDictKeys = enums.LangDictKeys
 SubsDictKeys = enums.SubsDictKeys
 VariousDefaults = enums.VariousDefaults
 
-# ---------------------------------------------------------------------------------------
+# --------- Types ----------
+CaptionListResponse = types.CaptionListResponse
+Caption = types.Caption
+CaptionSnippet = types.CaptionSnippet
+SubtitleEntry = types.SubtitleEntry
+SubtitleDict = types.SubtitleDict
+SubtitleDictInt = types.SubtitleDictInt
 
+# ---------------------------------------------------------------------------------------
 # List of objects to export
-exportObjects:list = [
+exportObjects: list[Any] = [
     os,
     sys,
     traceback,
@@ -74,13 +85,17 @@ exportObjects:list = [
     LangDataKeys,
     LangDictKeys,
     SubsDictKeys,
-    VariousDefaults
+    VariousDefaults,
+    # Types
+    SubtitleEntry,
+    SubtitleDict,
+    SubtitleDictInt
 ]
 
 # Export all objects
-objNameList:list = []
+objNameList: list[str] = []
 for obj in exportObjects:
     strName = [name for name in globals() if globals()[name] is obj][0]
     objNameList.append(strName)
+__all__ = objNameList  # type: ignore[reportUnsupportedDunderAll]
 
-__all__ = objNameList # type: ignore[reportUnsupportedDunderAll]

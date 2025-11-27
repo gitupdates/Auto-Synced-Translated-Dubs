@@ -117,7 +117,7 @@ def stretch_audio_clip(audioFileToStretch, speedFactor, num):
     return AudioSegment.from_file(virtualTempAudioFile, format="wav")
 
 
-def build_audio(subsDict:dict[int, dict[str, str|int]], langDict:dict[LangDictKeys, Any], totalAudioLength:int, twoPassVoiceSynth:bool=False):
+def build_audio(subsDict:SubtitleDictInt, langDict:dict[LangDictKeys, Any], totalAudioLength:int, twoPassVoiceSynth:bool=False):
     virtualTrimmedFileDict = {}
     # First trim silence off the audio files
     for key, value in subsDict.items():
@@ -180,7 +180,7 @@ def build_audio(subsDict:dict[int, dict[str, str|int]], langDict:dict[LangDictKe
             trimmedClip = trim_clip(rawClip)
             if config.debug_mode:
                 # Remove '.wav' from the end of the file path
-                secondPassTrimmedFile = value[SubsDictKeys.TTS_FilePath_Trimmed][:-4] + "_p2_trimmed.wav"
+                secondPassTrimmedFile = str(value[SubsDictKeys.TTS_FilePath_Trimmed])[:-4] + "_p2_trimmed.wav"
                 trimmedClip.export(secondPassTrimmedFile, format="wav")
             trimmedClip.export(virtualTrimmedFileDict[key], format="wav")
             keyIndex = list(subsDict.keys()).index(key)

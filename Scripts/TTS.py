@@ -13,7 +13,7 @@ import re
 from urllib.request import urlopen
 import aiohttp
 import asyncio
-from typing import Optional, Any
+from typing import Optional, Any, Dict, cast
 
 from Scripts.shared_imports import *
 import Scripts.auth as auth
@@ -29,7 +29,7 @@ ELEVENLABS_API_KEY = cloudConfig.elevenlabs_api_key
 
 # Get List of Voices Available
 def get_voices():
-    voices = auth.GOOGLE_TTS_API.voices().list().execute()
+    voices = auth.GOOGLE_TTS_API.voices().list().execute() #type:ignore
     voices_json = json.dumps(voices)
     return voices_json
 
@@ -142,8 +142,8 @@ def synthesize_text_google(text:str, speedFactor:float, voiceName:str, voiceGend
 
     # API Info at https://texttospeech.googleapis.com/$discovery/rest?version=v1
     # Try, if error regarding quota, waits a minute and tries again
-    def send_request(speedFactor):
-        response = auth.GOOGLE_TTS_API.text().synthesize(
+    def send_request(speedFactor:float) -> Dict[str, Any]:
+        response = auth.GOOGLE_TTS_API.text().synthesize( #type:ignore
             body={
                 'input':{
                     "text": text
@@ -244,7 +244,7 @@ async def synthesize_text_elevenlabs_async_http(text:str, voiceID:str, modelID:s
 
     return audio_bytes
 
-def synthesize_text_azure(text:str, duration, voiceName, languageCode, style) -> speechsdk.AudioDataStream:
+def synthesize_text_azure(text:str, duration:str|int|float, voiceName:str, languageCode:str, style:str) -> speechsdk.AudioDataStream:
 
     # Create tag for desired duration of clip
     durationTag = f'<mstts:audioduration value="{str(duration)}ms"/>'
@@ -290,12 +290,12 @@ def synthesize_text_azure(text:str, duration, voiceName, languageCode, style) ->
     synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
 
     #result = synthesizer.speak_text_async(text).get()
-    result = synthesizer.speak_ssml_async(ssml).get()
+    result:Optional[speechsdk.ResultFuture] = synthesizer.speak_ssml_async(ssml).get() #type:ignore
     
     stream = speechsdk.AudioDataStream(result)
     return stream
 
-def format_percentage_change(speedFactor) -> str:
+def format_percentage_change(speedFactor:float) -> str:
     # Determine speedFactor value for Azure TTS. It should be either 'default' or a relative change.
     if speedFactor == 1.0:
         rate = 'default'
@@ -309,7 +309,7 @@ def format_percentage_change(speedFactor) -> str:
         rate = percentSign + str(round((speedFactor - 1.0) * 100, 5)) + '%'
     return rate
 
-def synthesize_text_azure_batch(subsDict, langDict, skipSynthesize=False, secondPass=False) -> dict:
+def synthesize_text_azure_batch(subsDict:SubtitleDictInt, langDict:Dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDictInt:
 
     def create_request_payload(remainingEntriesDict):
         # Create SSML for all subtitles
@@ -503,7 +503,7 @@ def synthesize_text_azure_batch(subsDict, langDict, skipSynthesize=False, second
     return subsDict
 
 
-def synthesize_dictionary_batch(subsDict:dict[int, dict[str, str|int]], langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> dict[int, dict[str, str|int]]:
+def synthesize_dictionary_batch(subsDict:SubtitleDictInt, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDictInt:
     if not skipSynthesize:
         if cloudConfig.tts_service == TTSService.AZURE:
             subsDict = synthesize_text_azure_batch(subsDict, langDict, skipSynthesize, secondPass)
@@ -513,7 +513,7 @@ def synthesize_dictionary_batch(subsDict:dict[int, dict[str, str|int]], langDict
             exit()
     return subsDict
 
-async def synthesize_dictionary_async(subsDict:dict[int, dict[str, str|int]], langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, max_concurrent_jobs:int=2, secondPass:bool=False) -> dict[int, dict[str, str|int]]:
+async def synthesize_dictionary_async(subsDict:SubtitleDictInt, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, max_concurrent_jobs:int=2, secondPass:bool=False) -> SubtitleDictInt:
     semaphore = asyncio.Semaphore(max_concurrent_jobs)
     lock = asyncio.Lock()
     progress = 0
@@ -568,7 +568,7 @@ async def synthesize_dictionary_async(subsDict:dict[int, dict[str, str|int]], la
     return subsDict
 
 
-def synthesize_dictionary(subsDict:dict[int, dict[str, str|int]], langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> dict[int, dict[str, str|int]]:
+def synthesize_dictionary(subsDict:SubtitleDictInt, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDictInt:
     for key, value in subsDict.items():
         # TTS each subtitle text, write to file, write filename into dictionary
         filePath = os.path.join('workingFolder', f'{str(key)}.mp3')
@@ -579,7 +579,7 @@ def synthesize_dictionary(subsDict:dict[int, dict[str, str|int]], langDict:dict[
 
             if secondPass:
                 # Get speed factor from subsDict
-                speedFactor = subsDict[key][SubsDictKeys.speed_factor]
+                speedFactor = cast(float, subsDict[key][SubsDictKeys.speed_factor])
             else:
                 speedFactor = float(1.0)
 
@@ -592,7 +592,7 @@ def synthesize_dictionary(subsDict:dict[int, dict[str, str|int]], langDict:dict[
 
             # If Google TTS, use Google API
             if cloudConfig.tts_service == TTSService.GOOGLE:
-                audio = synthesize_text_google(value[SubsDictKeys.translated_text], speedFactor, langDict[LangDictKeys.voiceName], langDict[LangDictKeys.voiceGender], langDict[LangDictKeys.languageCode])
+                audio = synthesize_text_google(cast(str, value[SubsDictKeys.translated_text]), speedFactor, langDict[LangDictKeys.voiceName], langDict[LangDictKeys.voiceGender], langDict[LangDictKeys.languageCode])
                 with open(filePath, "wb") as out:
                     out.write(audio)
                 
@@ -607,7 +607,7 @@ def synthesize_dictionary(subsDict:dict[int, dict[str, str|int]], langDict:dict[
             # If Azure TTS, use Azure API
             elif cloudConfig.tts_service == TTSService.AZURE:
                 # Audio variable is an AudioDataStream object
-                audio = synthesize_text_azure(value[SubsDictKeys.translated_text], duration, langDict[LangDictKeys.voiceName], langDict[LangDictKeys.languageCode], langDict[LangDictKeys.voiceStyle])
+                audio = synthesize_text_azure(cast(str, value[SubsDictKeys.translated_text]), duration, langDict[LangDictKeys.voiceName], langDict[LangDictKeys.languageCode], langDict[LangDictKeys.voiceStyle])
                 # Save to file using save_to_wav_file method of audio object
                 audio.save_to_wav_file(filePath)
                 

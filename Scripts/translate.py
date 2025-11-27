@@ -8,7 +8,7 @@ import Scripts.utils as utils
 
 import configparser
 from operator import itemgetter
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 import sys
 import copy
 import os
@@ -229,7 +229,7 @@ def translate_with_google_and_process(textList:list[str], targetLanguage:str) ->
     
     combinedChunkTextString = add_marker_and_convert_to_string(textList, customMarkerTag=customMarkerTag)
     
-    response = auth.GOOGLE_TRANSLATE_API.projects().translateText(
+    response = auth.GOOGLE_TRANSLATE_API.projects().translateText( #type:ignore
         parent='projects/' + cloudConfig.google_project_id,
         body={
             'contents': combinedChunkTextString,
@@ -276,7 +276,7 @@ def translate_with_deepl_and_process(textList:list[str], targetLanguage:str, for
     return translatedProcessedTextsList
 
 # Translate the text entries of the dictionary
-def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:dict[LangDictKeys, Any], skipTranslation:bool=False, transcriptMode:bool=False, forceNativeSRTOutput:bool=False) -> dict[int, dict[str, str|int]]:
+def translate_dictionary(inputSubsDict:SubtitleDictInt, langDict:dict[LangDictKeys, Any], skipTranslation:bool=False, transcriptMode:bool=False, forceNativeSRTOutput:bool=False) -> SubtitleDictInt:
     targetLanguage:str = langDict[LangDictKeys.targetLanguage]
     translateService = langDict[LangDictKeys.translateService]
     formality:str = langDict[LangDictKeys.formality]
@@ -396,7 +396,7 @@ def translate_dictionary(inputSubsDict:dict[str, dict[str, str|int]], langDict:d
                 
             # Add the translated texts to the dictionary
             for i in range(len(chunkedTexts[j])):
-                key = str(subIndexToAddTo) 
+                key = subIndexToAddTo
                 inputSubsDict[key][SubsDictKeys.translated_text] = translatedTexts[i]
                 subIndexToAddTo += 1
                 # Print progress, ovwerwrite the same line
@@ -493,7 +493,7 @@ def download_youtube_auto_translations(languageCodeList:list[str], videoID:str, 
     def get_video_title(video_id: str) -> str:
         returnTitle:str = "[Unavailable Title]"
         try:
-            results:dict[str,Any] = auth.YOUTUBE_API.videos().list(
+            results:dict[str,Any] = auth.YOUTUBE_API.videos().list( #type:ignore
                 part="snippet",
                 id=video_id,
                 fields="items/snippet/title",
@@ -642,7 +642,7 @@ def set_translation_info(languageBatchDict:dict[str, Any]) -> dict[str, dict[str
 
 
 #======================================== Combine Subtitle Lines ================================================
-def combine_subtitles_advanced(inputDict:dict[str, dict[str, str|int]], maxCharacters:int=200):
+def combine_subtitles_advanced(inputDict:dict[int, dict[str, str|int|float]], maxCharacters:int=200):
     # Set gap threshold, the maximum gap between subtitles to combine
     gapThreshold:int = config.subtitle_gap_threshold_milliseconds
     charRateGoal:float
@@ -673,7 +673,7 @@ def combine_subtitles_advanced(inputDict:dict[str, dict[str, str|int]], maxChara
     # Don't change this, it is not an option, it is for keeping track
     noMorePossibleCombines:bool = False
     # Convert dictionary to list of dictionaries of the values
-    entryList:list[dict[str, str|int]] = []
+    entryList:list[dict[str, str|int|float]] = []
 
     for key, value in inputDict.items():
         value[SubsDictKeys.originalIndex] = int(key)-1
@@ -685,7 +685,7 @@ def combine_subtitles_advanced(inputDict:dict[str, dict[str, str|int]], maxChara
     # Convert the list back to a dictionary then return it
     return dict(enumerate(entryList, start=1))
 
-def combine_single_pass(entryListLocal:list[dict[str, str|int]], charRateGoal:float, gapThreshold:int, maxCharacters:int):   
+def combine_single_pass(entryListLocal:list[dict[str, str|int|float]], charRateGoal:float, gapThreshold:int, maxCharacters:int):   
     ## Don't change these, they are not options, they are for keeping track ##
     # Want to restart the loop if a change is made, so use this variable, otherwise break only if the end is reached
     reachedEndOfList = False
@@ -897,17 +897,17 @@ def combine_single_pass(entryListLocal:list[dict[str, str|int]], charRateGoal:fl
 #----------------------------------------------------------------------
 
 # Calculate the number of characters per second for each subtitle entry
-def calc_dict_speaking_rates(inputDict:list[dict[str, str|int]], dictKey:str=SubsDictKeys.translated_text):  
+def calc_dict_speaking_rates(inputDict:Dict[str, dict[str, str|int|float]], dictKey:str=SubsDictKeys.translated_text):  
     tempDict = copy.deepcopy(inputDict)
     for key, value in tempDict.items():
-        tempDict[key][SubsDictKeys.char_rate] = round(len(value[dictKey]) / (int(value[SubsDictKeys.duration_ms]) / 1000), 2)
+        tempDict[key][SubsDictKeys.char_rate] = round(len(str(value[dictKey])) / (int(value[SubsDictKeys.duration_ms]) / 1000), 2)
     return tempDict
 
-def calc_list_speaking_rates(inputList:list[dict[str, str|int]], charRateGoal:float, dictKey:str=SubsDictKeys.translated_text): 
+def calc_list_speaking_rates(inputList:list[Dict[str, str|int|float]], charRateGoal:float, dictKey:str=SubsDictKeys.translated_text): 
     tempList = copy.deepcopy(inputList)
     for i in range(len(tempList)):
         # Calculate the number of characters per second based on the duration of the entry
-        tempList[i][SubsDictKeys.char_rate] = round(len(tempList[i][dictKey]) / (int(tempList[i][SubsDictKeys.duration_ms]) / 1000), 2)
+        tempList[i][SubsDictKeys.char_rate] = round(len(str(tempList[i][dictKey])) / (int(tempList[i][SubsDictKeys.duration_ms]) / 1000), 2)
         # Calculate the difference between the current char_rate and the goal char_rate - Absolute Value
-        tempList[i][SubsDictKeys.char_rate_diff] = abs(round(tempList[i][SubsDictKeys.char_rate] - charRateGoal, 2))
+        tempList[i][SubsDictKeys.char_rate_diff] = abs(round(float(tempList[i][SubsDictKeys.char_rate]) - charRateGoal, 2))
     return tempList

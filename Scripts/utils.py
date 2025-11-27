@@ -20,7 +20,7 @@ def parseBool(string:str|bool, silent:bool=False):
     else:
         raise ValueError('Not a valid boolean string')
     
-def parseConfigSetting(setting) -> str | int | bool:
+def parseConfigSetting(setting:str) -> str | int | bool:
     # Remove any quotes user may have added in config file
     setting = setting.strip("\"").strip("\'")
 

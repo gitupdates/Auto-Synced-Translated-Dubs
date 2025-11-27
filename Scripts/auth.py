@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+# pyright: reportConstantRedefinition=false
+
 # Google Authentication Modules
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
+from googleapiclient.discovery import build             # pyright: ignore[reportUnknownVariableType, reportMissingTypeStubs]
+from google_auth_oauthlib.flow import InstalledAppFlow  # pyright: ignore[reportMissingTypeStubs]
+from google.oauth2.credentials import Credentials       # pyright: ignore[reportMissingTypeStubs]
+from google.auth.transport.requests import Request      # pyright: ignore[reportMissingTypeStubs]
 # from google.cloud import translate_v2
 
 from Scripts.shared_imports import *
@@ -17,14 +19,14 @@ import traceback
 from json import JSONDecodeError
 import configparser
 import deepl
-from typing import Any
+from typing import Any, Optional, Union, Tuple, overload, Literal
 
 # Google Cloud Globals
 token_file_name = 'token.pickle'
 youtube_token_filename = 'yt_token.pickle'
-GOOGLE_TTS_API:Any = None
-GOOGLE_TRANSLATE_API:Any = None
-YOUTUBE_API:Any = None
+GOOGLE_TTS_API:Optional[object] = None
+GOOGLE_TRANSLATE_API:Optional[object] = None
+YOUTUBE_API:Optional[object] = None
 
 # deepl Globals
 DEEPL_API = None
@@ -41,7 +43,11 @@ DEEPL_API = None
 # https://developers.google.com/api-client-library/python/guide/aaa_client_secrets
 
 # Authorize the request and store authorization credentials.
-def get_authenticated_service(youtubeAuth = False):
+@overload
+def get_authenticated_service(youtubeAuth: Literal[True]) -> object: ...
+@overload
+def get_authenticated_service(youtubeAuth: Literal[False]) -> Tuple[object, object]: ...
+def get_authenticated_service(youtubeAuth: bool = False) -> Union[object, Tuple[object, object]]:
   global GOOGLE_TTS_API
   global GOOGLE_TRANSLATE_API
   CLIENT_SECRETS_FILE = 'client_secrets.json'
@@ -92,36 +98,42 @@ def get_authenticated_service(youtubeAuth = False):
       input("\nPress Enter to Exit...")
       sys.exit()
 
-  creds = None
+  creds:Optional[object] = None
   # The file token.pickle stores the user's access and refresh tokens, and is
   # created automatically when the authorization flow completes for the first time.
   if os.path.exists(token_file):
-    creds = Credentials.from_authorized_user_file(token_file, scopes=API_SCOPES)
+    creds = Credentials.from_authorized_user_file(token_file, scopes=API_SCOPES) # type: ignore
 
   # If there are no (valid) credentials available, make the user log in.
   if not creds or not creds.valid:
-    if creds and creds.expired and creds.refresh_token:
-      creds.refresh(Request())
+    if creds and creds.expired and creds.refresh_token: # type: ignore
+      creds.refresh(Request()) # type: ignore
     else:
       print(f"\nPlease login using the browser window that opened just now.\n")
-      flow = InstalledAppFlow.from_client_secrets_file(secrets_file, scopes=API_SCOPES)
-      creds = flow.run_local_server(port=0, authorization_prompt_message="Waiting for authorization. See message above.")
+      flow:Optional[object] = InstalledAppFlow.from_client_secrets_file(secrets_file, scopes=API_SCOPES) # type: ignore
+      creds = flow.run_local_server(port=0, authorization_prompt_message="Waiting for authorization. See message above.") # type: ignore
       print(f"[OK] Authorization Complete.")
       # Save the credentials for the next run
     with open(token_file, 'w') as token:
-      token.write(creds.to_json())
+      token.write(creds.to_json()) # type: ignore
   
   if youtubeAuth:
     # Build YouTube API object
-    YOUTUBE_API =  build(YT_API_SERVICE_NAME, YT_API_VERSION, credentials=creds, discoveryServiceUrl=YT_DISCOVERY_SERVICE_URL)
-    return YOUTUBE_API
+    YOUTUBE_API =  build(YT_API_SERVICE_NAME, YT_API_VERSION, credentials=creds, discoveryServiceUrl=YT_DISCOVERY_SERVICE_URL) # type: ignore
+    if YOUTUBE_API is not None and isinstance(YOUTUBE_API, object):
+      return YOUTUBE_API
+    else:
+      raise Exception("Failed to build YouTube API service")
 
   # Build tts and translate API objects    
-  GOOGLE_TTS_API = build(GOOGLE_TTS_API_SERVICE_NAME, GOOGLE_TTS_API_VERSION, credentials=creds, discoveryServiceUrl=TTS_DISCOVERY_SERVICE_URL)
-  GOOGLE_TRANSLATE_API = build(GOOGLE_TRANSLATE_API_SERVICE_NAME, GOOGLE_TRANSLATE_API_VERSION, credentials=creds, discoveryServiceUrl=TRANSLATE_DISCOVERY_SERVICE_URL)
+  GOOGLE_TTS_API = build(GOOGLE_TTS_API_SERVICE_NAME, GOOGLE_TTS_API_VERSION, credentials=creds, discoveryServiceUrl=TTS_DISCOVERY_SERVICE_URL) # type: ignore
+  GOOGLE_TRANSLATE_API = build(GOOGLE_TRANSLATE_API_SERVICE_NAME, GOOGLE_TRANSLATE_API_VERSION, credentials=creds, discoveryServiceUrl=TRANSLATE_DISCOVERY_SERVICE_URL) # type: ignore
   # GOOGLE_TRANSLATE_V2_API = translate_v2.Client(credentials=creds)
   
-  return GOOGLE_TTS_API, GOOGLE_TRANSLATE_API
+  if (isinstance(GOOGLE_TTS_API, object) and isinstance(GOOGLE_TRANSLATE_API, object)):
+    return GOOGLE_TTS_API, GOOGLE_TRANSLATE_API
+  else:
+    raise Exception("Failed to build Google TTS or Translate API service")
 
 def youtube_authentication():
   global YOUTUBE_API
@@ -147,7 +159,7 @@ def youtube_authentication():
 def first_authentication():
   global GOOGLE_TTS_API, GOOGLE_TRANSLATE_API
   try:
-    GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = get_authenticated_service() # Create authentication object
+    GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = get_authenticated_service(False) # Create authentication object
   except JSONDecodeError as jx:
     print(f" [!!!] Error: " + str(jx))
     print(f"\nDid you make the yt_client_secrets.json file yourself by copying and pasting into it, instead of downloading it?")
@@ -158,7 +170,7 @@ def first_authentication():
     if "invalid_grant" in str(e):
       print(f"[!] Invalid token - Requires Re-Authentication")
       os.remove(token_file_name)
-      GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = get_authenticated_service()
+      GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = get_authenticated_service(False)
     else:
       print('\n')
       traceback.print_exc() # Prints traceback
