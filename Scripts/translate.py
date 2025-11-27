@@ -276,7 +276,7 @@ def translate_with_deepl_and_process(textList:list[str], targetLanguage:str, for
     return translatedProcessedTextsList
 
 # Translate the text entries of the dictionary
-def translate_dictionary(inputSubsDict:SubtitleDictInt, langDict:dict[LangDictKeys, Any], skipTranslation:bool=False, transcriptMode:bool=False, forceNativeSRTOutput:bool=False) -> SubtitleDictInt:
+def translate_dictionary(inputSubsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], skipTranslation:bool=False, transcriptMode:bool=False, forceNativeSRTOutput:bool=False) -> SubtitleDict:
     targetLanguage:str = langDict[LangDictKeys.targetLanguage]
     translateService = langDict[LangDictKeys.translateService]
     formality:str = langDict[LangDictKeys.formality]

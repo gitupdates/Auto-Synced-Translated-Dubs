@@ -309,7 +309,7 @@ def format_percentage_change(speedFactor:float) -> str:
         rate = percentSign + str(round((speedFactor - 1.0) * 100, 5)) + '%'
     return rate
 
-def synthesize_text_azure_batch(subsDict:SubtitleDictInt, langDict:Dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDictInt:
+def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDict:
 
     def create_request_payload(remainingEntriesDict):
         # Create SSML for all subtitles
@@ -503,7 +503,7 @@ def synthesize_text_azure_batch(subsDict:SubtitleDictInt, langDict:Dict[LangDict
     return subsDict
 
 
-def synthesize_dictionary_batch(subsDict:SubtitleDictInt, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDictInt:
+def synthesize_dictionary_batch(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDict:
     if not skipSynthesize:
         if cloudConfig.tts_service == TTSService.AZURE:
             subsDict = synthesize_text_azure_batch(subsDict, langDict, skipSynthesize, secondPass)
@@ -513,7 +513,7 @@ def synthesize_dictionary_batch(subsDict:SubtitleDictInt, langDict:dict[LangDict
             exit()
     return subsDict
 
-async def synthesize_dictionary_async(subsDict:SubtitleDictInt, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, max_concurrent_jobs:int=2, secondPass:bool=False) -> SubtitleDictInt:
+async def synthesize_dictionary_async(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, max_concurrent_jobs:int=2, secondPass:bool=False) -> SubtitleDict:
     semaphore = asyncio.Semaphore(max_concurrent_jobs)
     lock = asyncio.Lock()
     progress = 0
@@ -568,7 +568,7 @@ async def synthesize_dictionary_async(subsDict:SubtitleDictInt, langDict:dict[La
     return subsDict
 
 
-def synthesize_dictionary(subsDict:SubtitleDictInt, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDictInt:
+def synthesize_dictionary(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDict:
     for key, value in subsDict.items():
         # TTS each subtitle text, write to file, write filename into dictionary
         filePath = os.path.join('workingFolder', f'{str(key)}.mp3')

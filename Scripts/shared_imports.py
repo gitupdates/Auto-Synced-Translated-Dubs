@@ -54,8 +54,8 @@ CaptionListResponse = types.CaptionListResponse
 Caption = types.Caption
 CaptionSnippet = types.CaptionSnippet
 SubtitleEntry = types.SubtitleEntry
+SubtitleDictStr = types.SubtitleDictStr
 SubtitleDict = types.SubtitleDict
-SubtitleDictInt = types.SubtitleDictInt
 
 # ---------------------------------------------------------------------------------------
 # List of objects to export
@@ -88,8 +88,8 @@ exportObjects: list[Any] = [
     VariousDefaults,
     # Types
     SubtitleEntry,
-    SubtitleDict,
-    SubtitleDictInt
+    SubtitleDictStr,
+    SubtitleDict
 ]
 
 # Export all objects
