@@ -48,6 +48,7 @@ LangDataKeys = enums.LangDataKeys
 LangDictKeys = enums.LangDictKeys
 SubsDictKeys = enums.SubsDictKeys
 VariousDefaults = enums.VariousDefaults
+AuthCloudServices = enums.AuthCloudServices
 
 # --------- Types ----------
 CaptionListResponse = types.CaptionListResponse
@@ -86,6 +87,7 @@ exportObjects: list[Any] = [
     LangDictKeys,
     SubsDictKeys,
     VariousDefaults,
+    AuthCloudServices,
     # Types
     SubtitleEntry,
     SubtitleDictStr,

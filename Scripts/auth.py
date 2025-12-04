@@ -139,12 +139,14 @@ def youtube_authentication():
   try:
     YOUTUBE_API = get_authenticated_service(youtubeAuth = True) # Create authentication object
   except JSONDecodeError as jx:
+    YOUTUBE_API = None
     print(f" [!!!] Error: " + str(jx))
     print(f"\nDid you make the client_secrets.json file yourself by copying and pasting into it, instead of downloading it?")
 
     input("Press Enter to Exit...")
     sys.exit()
   except Exception as e:
+    YOUTUBE_API = None
     if "invalid_grant" in str(e):
       print(f"[!] Invalid token - Requires Re-Authentication")
       os.remove(youtube_token_filename)
@@ -153,6 +155,7 @@ def youtube_authentication():
       print(f" [!!!] Error: " + str(e))
       input("Press Enter to Exit...")
       sys.exit()
+      
   return YOUTUBE_API
 
 def first_authentication():
@@ -166,6 +169,8 @@ def first_authentication():
     input("Press Enter to Exit...")
     sys.exit()
   except Exception as e:
+    GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = None, None # Clear them so we know they aren't valid
+    
     if "invalid_grant" in str(e):
       print(f"[!] Invalid token - Requires Re-Authentication")
       os.remove(token_file_name)
@@ -177,25 +182,37 @@ def first_authentication():
       print(f"[!!!] Error: " + str(e))
       input(f"\nError: Something went wrong during authentication. Try deleting the token.pickle file. \nPress Enter to Exit...")
       sys.exit()
+      
   return GOOGLE_TTS_API, GOOGLE_TRANSLATE_API
 
 
-################################################################################################
-################################## DEEPL AUTHORIZATION #########################################
-################################################################################################
-
 def deepl_auth():
-  # Deepl API Key
+  global DEEPL_API
   deepl_auth_object = deepl.Translator(cloudConfig.deepl_api_key)
+  DEEPL_API = deepl_auth_object
   return deepl_auth_object
 
-if cloudConfig.translate_service == 'deepl':
-  DEEPL_API = deepl_auth()
+
+def authenticate_required_services(): 
+  if cloudConfig.tts_service == TTSService.GOOGLE or (config.skip_translation == False and (cloudConfig.translate_service == TTSService.GOOGLE or cloudConfig.use_fallback_google_translate)):
+    first_authentication() # The function itself will set the values of the globals
+    
+  if cloudConfig.translate_service == 'deepl':
+    deepl_auth()
 
 
-#################################################################################################
-################################## GOOGLE AUTHORIZATION #########################################
-#################################################################################################
-
-if cloudConfig.tts_service == TTSService.GOOGLE or (config.skip_translation == False and (cloudConfig.translate_service == TTSService.GOOGLE or cloudConfig.use_fallback_google_translate)):
-  GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = first_authentication()
+@overload
+def authenticate_specific_service(service: Literal[AuthCloudServices.GOOGLE]) -> Tuple[object, object]: ...
+@overload
+def authenticate_specific_service(service: Literal[AuthCloudServices.DEEPL]) -> deepl.Translator: ...
+@overload
+def authenticate_specific_service(service: Literal[AuthCloudServices.YOUTUBE]) -> object: ...
+def authenticate_specific_service(service: AuthCloudServices) -> Union[object, Tuple[object, object], deepl.Translator]: 
+  if service == AuthCloudServices.GOOGLE and GOOGLE_TRANSLATE_API == None and GOOGLE_TRANSLATE_API == None:
+    return first_authentication()
+    
+  elif service == AuthCloudServices.DEEPL and DEEPL_API == None:
+    return deepl_auth()
+    
+  elif service == AuthCloudServices.YOUTUBE and YOUTUBE_API == None:
+    return youtube_authentication()

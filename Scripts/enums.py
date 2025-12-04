@@ -18,6 +18,12 @@ class TTSService(str, Enum):
     def __str__(self):
         return self.value
 
+# Cloud services that need a dedicated authenticated object
+class AuthCloudServices(Enum):
+    GOOGLE = "google"
+    DEEPL = "deepl"
+    YOUTUBE = "youtube"
+
 class AudioFormat(str, Enum):
     MP3 = "mp3"
     AAC = "aac"

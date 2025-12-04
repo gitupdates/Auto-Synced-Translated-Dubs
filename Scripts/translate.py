@@ -6,6 +6,8 @@ from Scripts.shared_imports import *
 import Scripts.auth as auth
 import Scripts.utils as utils
 
+auth.authenticate_required_services()
+
 from operator import itemgetter
 from typing import Any, Optional, Dict
 import sys

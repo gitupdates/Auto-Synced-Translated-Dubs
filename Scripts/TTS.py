@@ -16,6 +16,7 @@ from typing import Optional, Any, Dict, cast
 
 from Scripts.shared_imports import *
 import Scripts.auth as auth
+auth.authenticate_required_services() #Might not be necessary to do right after import but just in case
 import Scripts.azure_batch as azure_batch
 import Scripts.utils as utils
 
