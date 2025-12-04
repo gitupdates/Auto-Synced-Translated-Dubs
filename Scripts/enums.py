@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-from enum import Enum
+import enum
 
-class TranslateService(str, Enum):
+class TranslateService(str, enum.Enum):
     GOOGLE = "google"
     DEEPL = "deepl"
 
     def __str__(self):
         return self.value
 
-class TTSService(str, Enum):
+class TTSService(str, enum.Enum):
     AZURE = "azure"
     GOOGLE = "google"
     ELEVENLABS = "elevenlabs"
@@ -19,12 +19,12 @@ class TTSService(str, Enum):
         return self.value
 
 # Cloud services that need a dedicated authenticated object
-class AuthCloudServices(Enum):
+class AuthCloudServices(enum.Enum):
     GOOGLE = "google"
     DEEPL = "deepl"
     YOUTUBE = "youtube"
 
-class AudioFormat(str, Enum):
+class AudioFormat(str, enum.Enum):
     MP3 = "mp3"
     AAC = "aac"
     WAV = "wav"
@@ -32,14 +32,14 @@ class AudioFormat(str, Enum):
     def __str__(self):
         return self.value
 
-class AudioStretchMethod(str, Enum):
+class AudioStretchMethod(str, enum.Enum):
     FFMPEG = "ffmpeg"
     RUBBERBAND = "rubberband"
     
     def __str__(self):
         return self.value
 
-class ElevenLabsModel(str, Enum):
+class ElevenLabsModel(str, enum.Enum):
     MONOLINGUAL_V1 = "eleven_monolingual_v1"
     MULTILINGUAL_V2 = "eleven_multilingual_v2"
     DEFAULT = "default"
@@ -47,7 +47,7 @@ class ElevenLabsModel(str, Enum):
     def __str__(self):
         return self.value
 
-class FormalityPreference(str, Enum):
+class FormalityPreference(str, enum.Enum):
     DEFAULT = "default"
     MORE = "more"
     LESS = "less"
@@ -55,7 +55,7 @@ class FormalityPreference(str, Enum):
     def __str__(self):
         return self.value
     
-class LangDataKeys(str, Enum):
+class LangDataKeys(str, enum.Enum):
     translation_target_language = "translation_target_language"
     synth_voice_name = "synth_voice_name"
     synth_language_code = "synth_language_code"
@@ -68,7 +68,7 @@ class LangDataKeys(str, Enum):
     def __str__(self) -> str:
         return self.value
     
-class LangDictKeys(str, Enum):
+class LangDictKeys(str, enum.Enum):
     targetLanguage = "targetLanguage"
     voiceName = "voiceName"
     languageCode = "languageCode"
@@ -81,7 +81,7 @@ class LangDictKeys(str, Enum):
     def __str__(self):
         return self.value
     
-class SubsDictKeys(str, Enum):
+class SubsDictKeys(str, enum.Enum):
     start_ms = "start_ms"
     end_ms = "end_ms"
     duration_ms = "duration_ms"

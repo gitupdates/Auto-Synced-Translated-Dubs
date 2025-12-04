@@ -1,17 +1,23 @@
+# pyright: reportConstantRedefinition=false
+# pyright: reportUnusedImport=false
+
+# Imports that won't be exported. Only needed 
+import configparser
+
+_EXPORT_START = set(globals().keys()) # This serves as a marker after which anything declared or imported will be exported
+
 import os
 import sys
-import traceback
-import configparser
+import traceback 
 import re
 import regex
 from typing import Any
 
-# pyright: reportConstantRedefinition=false
-
+# My Imports
 from Scripts.utils import parseBool
-import Scripts.enums as enums
-import Scripts.types as types
 from Scripts.load_configs import config, cloudConfig
+from Scripts.enums import *
+from Scripts.types import *
 
 batchConfig = configparser.ConfigParser()
 batchConfig.read('batch.ini') # Don't process this one, need sections in tact for languages
@@ -36,68 +42,8 @@ if config.debug_mode and (ORIGINAL_VIDEO_PATH == '' or ORIGINAL_VIDEO_PATH.lower
     ORIGINAL_VIDEO_PATH = 'Debug.test'
 else:
     ORIGINAL_VIDEO_PATH = os.path.abspath(ORIGINAL_VIDEO_PATH.strip("\""))
-    
-# ------ Enums -------
-TranslateService = enums.TranslateService
-TTSService = enums.TTSService
-AudioFormat = enums.AudioFormat
-AudioStretchMethod = enums.AudioStretchMethod
-ElevenLabsModel = enums.ElevenLabsModel
-FormalityPreference = enums.FormalityPreference
-LangDataKeys = enums.LangDataKeys
-LangDictKeys = enums.LangDictKeys
-SubsDictKeys = enums.SubsDictKeys
-VariousDefaults = enums.VariousDefaults
-AuthCloudServices = enums.AuthCloudServices
 
-# --------- Types ----------
-CaptionListResponse = types.CaptionListResponse
-Caption = types.Caption
-CaptionSnippet = types.CaptionSnippet
-SubtitleEntry = types.SubtitleEntry
-SubtitleDictStr = types.SubtitleDictStr
-SubtitleDict = types.SubtitleDict
 
-# ---------------------------------------------------------------------------------------
-# List of objects to export
-exportObjects: list[Any] = [
-    os,
-    sys,
-    traceback,
-    config,
-    cloudConfig,
-    batchConfig,
-    ORIGINAL_VIDEO_PATH,
-    ORIGINAL_VIDEO_NAME,
-    OUTPUT_DIRECTORY,
-    OUTPUT_YTSYNCED_DIRECTORY,
-    OUTPUT_FOLDER,
-    OUTPUT_YTSYNCED_FOLDER,
-    re,
-    regex,
-    parseBool,
-    # Enums
-    TranslateService,
-    TTSService,
-    AudioFormat,
-    AudioStretchMethod,
-    ElevenLabsModel,
-    FormalityPreference,
-    LangDataKeys,
-    LangDictKeys,
-    SubsDictKeys,
-    VariousDefaults,
-    AuthCloudServices,
-    # Types
-    SubtitleEntry,
-    SubtitleDictStr,
-    SubtitleDict
-]
-
-# Export all objects
-objNameList: list[str] = []
-for obj in exportObjects:
-    strName = [name for name in globals() if globals()[name] is obj][0]
-    objNameList.append(strName)
-__all__ = objNameList  # type: ignore[reportUnsupportedDunderAll]
+# Export anything in the global scope
+__all__ = [name for name in globals() if name not in _EXPORT_START and not name.startswith('_')] # type: ignore[reportUnsupportedDunderAll]
 

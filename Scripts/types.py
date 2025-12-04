@@ -1,4 +1,4 @@
-from typing import TypedDict, List
+import typing
 
 
 # Subtitle Dictionary Types
@@ -46,7 +46,7 @@ Audio processing fields (added during audio building):
 """
 
 
-class CaptionSnippet(TypedDict):
+class CaptionSnippet(typing.TypedDict):
     videoId: str
     lastUpdated: str
     trackKind: str
@@ -60,13 +60,13 @@ class CaptionSnippet(TypedDict):
     isAutoSynced: bool
     status: str
 
-class Caption(TypedDict):
+class Caption(typing.TypedDict):
     kind: str
     etag: str
     id: str
     snippet: CaptionSnippet
 
-class CaptionListResponse(TypedDict):
+class CaptionListResponse(typing.TypedDict):
     kind: str
     etag: str
-    items: List[Caption]
+    items: typing.List[Caption]
