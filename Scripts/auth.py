@@ -8,6 +8,8 @@ from googleapiclient.discovery import build             # pyright: ignore[report
 from google_auth_oauthlib.flow import InstalledAppFlow  # pyright: ignore[reportMissingTypeStubs]
 from google.oauth2.credentials import Credentials       # pyright: ignore[reportMissingTypeStubs]
 from google.auth.transport.requests import Request      # pyright: ignore[reportMissingTypeStubs]
+import httplib2                                         # pyright: ignore[reportMissingTypeStubs]
+import google_auth_httplib2                             # pyright: ignore[reportMissingTypeStubs]
 # from google.cloud import translate_v2
 
 from Scripts.shared_imports import *
@@ -43,10 +45,10 @@ DEEPL_API = None
 
 # Authorize the request and store authorization credentials.
 @overload
-def get_authenticated_service(youtubeAuth: Literal[True]) -> object: ...
+def get_authenticated_service(youtubeAuth: Literal[True], specifySecretsFile:Optional[str]=None) -> object: ...
 @overload
-def get_authenticated_service(youtubeAuth: Literal[False]) -> Tuple[object, object]: ...
-def get_authenticated_service(youtubeAuth: bool = False) -> Union[object, Tuple[object, object]]:
+def get_authenticated_service(youtubeAuth: Literal[False], specifySecretsFile:Optional[str]=None) -> Tuple[object, object]: ...
+def get_authenticated_service(youtubeAuth: bool = False, specifySecretsFile:Optional[str]=None) -> Union[object, Tuple[object, object]]:
   global GOOGLE_TTS_API
   global GOOGLE_TRANSLATE_API
   CLIENT_SECRETS_FILE = 'client_secrets.json'
@@ -66,6 +68,7 @@ def get_authenticated_service(youtubeAuth: bool = False) -> Union[object, Tuple[
 
   # YouTube API Info
   YT_READ_WRITE_SSL_SCOPE = ['https://www.googleapis.com/auth/youtube.force-ssl']
+  # YT_READ_WRITE_SSL_SCOPE = ['https://www.googleapis.com/auth/youtube']
   YT_API_SERVICE_NAME = 'youtube'
   YT_API_VERSION = 'v3'
   YT_DISCOVERY_SERVICE_URL = "https://youtube.googleapis.com/$discovery/rest?version=v3"
@@ -76,12 +79,18 @@ def get_authenticated_service(youtubeAuth: bool = False) -> Union[object, Tuple[
   else:
     API_SCOPES = GOOGLE_API_SCOPES
 
-  if youtubeAuth == True:
+  if specifySecretsFile != None:
+    # Make a token file name based on the specified secrets file
+    token_file = f"{os.path.splitext(specifySecretsFile)[0]}_token.pickle"
+  elif youtubeAuth == True:
     token_file = youtube_token_filename
   else:
     token_file = token_file_name
 
-  if youtubeAuth == True:
+  # Secrets File, either hard coded or specified
+  if specifySecretsFile != None:
+    secrets_file = specifySecretsFile
+  elif youtubeAuth == True:
     secrets_file = YOUTUBE_CLIENT_SECRETS_FILE
   else:
     secrets_file = CLIENT_SECRETS_FILE
@@ -124,9 +133,17 @@ def get_authenticated_service(youtubeAuth: bool = False) -> Union[object, Tuple[
     else:
       raise Exception("Failed to build YouTube API service")
 
-  # Build tts and translate API objects    
-  GOOGLE_TTS_API = build(GOOGLE_TTS_API_SERVICE_NAME, GOOGLE_TTS_API_VERSION, credentials=creds, discoveryServiceUrl=TTS_DISCOVERY_SERVICE_URL) # type: ignore
-  GOOGLE_TRANSLATE_API = build(GOOGLE_TRANSLATE_API_SERVICE_NAME, GOOGLE_TRANSLATE_API_VERSION, credentials=creds, discoveryServiceUrl=TRANSLATE_DISCOVERY_SERVICE_URL) # type: ignore
+  # Build tts and translate API objects
+  # Credentials and http parameter for build are mutually exclusive
+  if cloudConfig.google_translate_mode == GoogleTranslateMode.LLM:
+    # For LLM mode increase timeout because it takes longer. Create HTTP object with increased timeout (default is socket timeout, typically 60s)
+    http = google_auth_httplib2.AuthorizedHttp(creds, http=httplib2.Http(timeout=300))  # 5 minutes timeout
+    GOOGLE_TTS_API = build(GOOGLE_TTS_API_SERVICE_NAME, GOOGLE_TTS_API_VERSION, http=http, discoveryServiceUrl=TTS_DISCOVERY_SERVICE_URL) # type: ignore
+    GOOGLE_TRANSLATE_API = build(GOOGLE_TRANSLATE_API_SERVICE_NAME, GOOGLE_TRANSLATE_API_VERSION, http=http, discoveryServiceUrl=TRANSLATE_DISCOVERY_SERVICE_URL) # type: ignore
+  else:
+    GOOGLE_TTS_API = build(GOOGLE_TTS_API_SERVICE_NAME, GOOGLE_TTS_API_VERSION, credentials=creds, discoveryServiceUrl=TTS_DISCOVERY_SERVICE_URL) # type: ignore
+    GOOGLE_TRANSLATE_API = build(GOOGLE_TRANSLATE_API_SERVICE_NAME, GOOGLE_TRANSLATE_API_VERSION, credentials=creds, discoveryServiceUrl=TRANSLATE_DISCOVERY_SERVICE_URL) # type: ignore
+
   # GOOGLE_TRANSLATE_V2_API = translate_v2.Client(credentials=creds)
   
   if (isinstance(GOOGLE_TTS_API, object) and isinstance(GOOGLE_TRANSLATE_API, object)):
@@ -134,10 +151,10 @@ def get_authenticated_service(youtubeAuth: bool = False) -> Union[object, Tuple[
   else:
     raise Exception("Failed to build Google TTS or Translate API service")
 
-def youtube_authentication():
+def youtube_authentication(specifySecretsFile:Optional[str] = None):
   global YOUTUBE_API
   try:
-    YOUTUBE_API = get_authenticated_service(youtubeAuth = True) # Create authentication object
+    YOUTUBE_API = get_authenticated_service(youtubeAuth = True, specifySecretsFile=specifySecretsFile) # Create authentication object
   except JSONDecodeError as jx:
     YOUTUBE_API = None
     print(f" [!!!] Error: " + str(jx))
@@ -158,10 +175,10 @@ def youtube_authentication():
       
   return YOUTUBE_API
 
-def first_authentication():
+def first_authentication(specifySecretsFile:Optional[str] = None):
   global GOOGLE_TTS_API, GOOGLE_TRANSLATE_API
   try:
-    GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = get_authenticated_service(False) # Create authentication object
+    GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = get_authenticated_service(False, specifySecretsFile=specifySecretsFile) # Create authentication object
   except JSONDecodeError as jx:
     print(f" [!!!] Error: " + str(jx))
     print(f"\nDid you make the yt_client_secrets.json file yourself by copying and pasting into it, instead of downloading it?")
@@ -174,7 +191,7 @@ def first_authentication():
     if "invalid_grant" in str(e):
       print(f"[!] Invalid token - Requires Re-Authentication")
       os.remove(token_file_name)
-      GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = get_authenticated_service(False)
+      GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = get_authenticated_service(False, specifySecretsFile=specifySecretsFile)
     else:
       print('\n')
       traceback.print_exc() # Prints traceback
@@ -202,17 +219,17 @@ def authenticate_required_services():
 
 
 @overload
-def authenticate_specific_service(service: Literal[AuthCloudServices.GOOGLE]) -> Tuple[object, object]: ...
+def authenticate_specific_service(service: Literal[AuthCloudServices.GOOGLE], specifySecretsFile:Optional[str] = None) -> Tuple[object, object]: ...
 @overload
 def authenticate_specific_service(service: Literal[AuthCloudServices.DEEPL]) -> deepl.Translator: ...
 @overload
-def authenticate_specific_service(service: Literal[AuthCloudServices.YOUTUBE]) -> object: ...
-def authenticate_specific_service(service: AuthCloudServices) -> Union[object, Tuple[object, object], deepl.Translator]: 
+def authenticate_specific_service(service: Literal[AuthCloudServices.YOUTUBE], specifySecretsFile:Optional[str] = None) -> object: ...
+def authenticate_specific_service(service: AuthCloudServices, specifySecretsFile:Optional[str] = None) -> Union[object, Tuple[object, object], deepl.Translator]: 
   if service == AuthCloudServices.GOOGLE and GOOGLE_TRANSLATE_API == None and GOOGLE_TRANSLATE_API == None:
-    return first_authentication()
+    return first_authentication(specifySecretsFile=specifySecretsFile)
     
   elif service == AuthCloudServices.DEEPL and DEEPL_API == None:
     return deepl_auth()
     
   elif service == AuthCloudServices.YOUTUBE and YOUTUBE_API == None:
-    return youtube_authentication()
+    return youtube_authentication(specifySecretsFile=specifySecretsFile)

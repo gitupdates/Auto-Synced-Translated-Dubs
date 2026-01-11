@@ -85,7 +85,7 @@ def ends_with_sentence_terminator(text:str) -> bool:
     sentence_terminators = [
         '.', '. ', '!', '! ', '?', '? ', '."', '." ',  # English and similar
         '。',  # Japanese, Chinese
-        '…',  # Ellipsis
+        # '…',  # Ellipsis
         '¿', '¡',  # Spanish inverted punctuation
         '۔',  # Arabic full stop
         '।',  # Devanagari (Hindi, etc.)
@@ -148,7 +148,7 @@ def convertChunkListToCompatibleDict(chunkList: list[str]) -> dict[str, dict[str
     return chunkDict
 
 # Add marker custom marker tags
-def add_marker_and_convert_to_string(textList:list[str], customMarkerTag:str) -> str:
+def add_marker_and_convert_to_string(textList:list[str], customMarkerTag:str, endingTag:Optional[str]="") -> str:
     # If no brackets already on custom marker tag, add them
     if customMarkerTag[0] != '<':
         customMarkerTag = '<' + customMarkerTag
@@ -156,12 +156,22 @@ def add_marker_and_convert_to_string(textList:list[str], customMarkerTag:str) ->
         customMarkerTag = customMarkerTag + '>'
     
     combinedString  = ""
+    # Keep track of the tags so we can close them if possible.
+    # Mostly for google which limits how many it will auto add. But it adds start and closing of tags as a termination so we need to only add the closing tag at the end of a sentence.
+    currentOpenTagsCount = 0 
+    
     for i, text in enumerate(textList):
         # If last line don't add the tag
         if i == len(textList) - 1:
             combinedString += text
         else:
-            combinedString += text + f" {customMarkerTag}"
+            combinedString += text + f"{customMarkerTag}" # Before I had a space before the custom tag but will try not doing that
+            currentOpenTagsCount += 1
+        # If the text line ends with a period, dump and closing tags
+        if endingTag and ends_with_sentence_terminator(text):
+            combinedString += (endingTag * currentOpenTagsCount)
+            currentOpenTagsCount = 0
+            
     return combinedString
 
 def split_and_clean_marked_combined_string(originalCombinedString:str, customMarkerTag:str, removeExtraAddedTag:str='') -> list[str]:
@@ -224,23 +234,55 @@ def split_and_clean_marked_combined_string(originalCombinedString:str, customMar
     return textList
 
 def translate_with_google_and_process(textList:list[str], targetLanguage:str) -> list[str]:
+    mode = cloudConfig.google_translate_mode
+    
     # Set an html tag that will be used as marker to split the text later. Must be treated as neutral by Google Cloud, which seems to only be found by trial and error
     customMarkerTag:str = '<b>'
     endingTag:str = '</b>'
+    endingTagToAddOurselves=""
     
-    combinedChunkTextString = add_marker_and_convert_to_string(textList, customMarkerTag=customMarkerTag)
+    # Only add ending tag ourselves if there are actually line terminators on any of the lines. Don't do it for subtitles with no punctuation
+    for text in textList:
+        if ends_with_sentence_terminator(text):
+            endingTagToAddOurselves = endingTag
+            break
     
-    response = auth.GOOGLE_TRANSLATE_API.projects().translateText( #type:ignore
-        parent='projects/' + cloudConfig.google_project_id,
-        body={
-            'contents': combinedChunkTextString,
-            'sourceLanguageCode': config.original_language,
-            'targetLanguageCode': targetLanguage,
-            'mimeType': 'text/html',
-            #'model': 'nmt',
-            #'glossaryConfig': {}
-        }
-    ).execute()
+    combinedChunkTextString = add_marker_and_convert_to_string(textList, customMarkerTag=customMarkerTag, endingTag=endingTagToAddOurselves)
+    
+    if mode == GoogleTranslateMode.LLM:
+        # Construct the base path including location (usually 'global' for standard usage)
+        location = 'us-central1' # Must be us-central1 apparently
+        parent_path = f'projects/{cloudConfig.google_project_id}/locations/{location}'
+
+        # The specific model ID for the Translation LLM
+        # Format: projects/{project-id}/locations/{location-id}/models/general/translation-llm
+        model_path = f'{parent_path}/models/general/translation-llm'
+
+        response = auth.GOOGLE_TRANSLATE_API.projects().locations().translateText( #type:ignore
+            parent=parent_path,
+            body={
+                'contents': combinedChunkTextString,
+                'sourceLanguageCode': config.original_language,
+                'targetLanguageCode': targetLanguage,
+                'mimeType': 'text/html',
+                'model': model_path,
+                #'glossaryConfig': {}
+            }
+        ).execute()
+            
+    else:
+        response = auth.GOOGLE_TRANSLATE_API.projects().translateText( #type:ignore
+            parent='projects/' + cloudConfig.google_project_id,
+            body={
+                'contents': combinedChunkTextString,
+                'sourceLanguageCode': config.original_language,
+                'targetLanguageCode': targetLanguage,
+                'mimeType': 'text/html',
+                #'model': 'nmt',
+                #'glossaryConfig': {}
+            }
+        ).execute()
+        
     translatedTextString:str = response['translations'][0]['translatedText']
     
     # Clean and process text
@@ -281,7 +323,7 @@ def translate_dictionary(inputSubsDict:SubtitleDict, langDict:dict[LangDictKeys,
     targetLanguage:str = langDict[LangDictKeys.targetLanguage]
     translateService = langDict[LangDictKeys.translateService]
     formality:str = langDict[LangDictKeys.formality]
-
+        
     # Create a container for all the text to be translated
     textToTranslate:list[str] = []
     
@@ -310,19 +352,32 @@ def translate_dictionary(inputSubsDict:SubtitleDict, langDict:dict[LangDictKeys,
     #     codepoints += len(text.encode("utf-8"))
       
     if skipTranslation == False:
-        maxCodePoints = 9999 # Placeholder
-        maxLines = 999 # Placeholder
+        maxCodePoints = 999999 # Placeholder
+        maxCodePointsHard = 999999
+        maxLines = 99999 # Placeholder
+        maxLinesHard = 99999
         # Set maxCodePoints based on translate service. This will determine the chunk size
         # Google's API limit is 30000 Utf-8 codepoints per request, while DeepL's is 130000, but we leave some room just in case
         if translateService == TranslateService.GOOGLE:
-            # maxCodePoints = 27000
-            maxCodePoints = 5000 # Not the hard limit, but recommended
-            # For the workaround to get it to keep HTML markers in place, can't do more than 50 subtitle lines worth, so set 40 for buffer
-            # This isn't a limit for the request, but how many lines can be combined into a single string for the workaround
-            maxLines = 40
+            if cloudConfig.google_translate_mode == GoogleTranslateMode.LLM:
+                maxCodePoints = 27000
+                maxCodePointsHard = 30000
+                maxLines = 100
+                maxLinesHard = 150
+            else:
+                # maxCodePoints = 5000 # Not the hard limit, but recommended
+                maxCodePoints = 27000
+                maxCodePointsHard = 30000
+                # For the workaround to get it to keep HTML markers in place, can't do more than 50 subtitle lines worth, so set 40 for buffer
+                # This isn't a limit for the request, but how many lines can be combined into a single string for the workaround
+                maxLines = 100
+                maxLinesHard = 150
+                
         elif translateService == TranslateService.DEEPL:
             maxCodePoints = 100000
+            maxCodePointsHard = maxCodePoints
             maxLines = 999999 # No such needed limit for DeepL, but set to a high number just in case
+            maxLinesHard = maxLines
             
         # Create a list of lists - 'chunkedTexts' where each list is a 'chunk', which in itself contains a list of strings of text to be translated
         chunkedTexts:list[list[str]] = []
@@ -341,17 +396,19 @@ def translate_dictionary(inputSubsDict:SubtitleDict, langDict:dict[LangDictKeys,
                     
             # For google need to additionally check for maxLines
             elif currentChunk and translateService == TranslateService.GOOGLE:
-                # Set soft limit of 40 lines or 5000 code points, where only splits chunk if ending sentence
-                if (len(currentChunk) >= maxLines or currentCodePoints + textCodePoints > maxCodePoints) and text.endswith(('.', '. ','!','! ','?','? ', '."','." ')):
+                # Set hard limit, where it will split chunk even if not ending sentence
+                if (len(currentChunk) >= maxLinesHard or currentCodePoints + textCodePoints > maxCodePointsHard):
                     chunkedTexts.append(currentChunk)
-                    currentChunk = []
-                    currentCodePoints = 0
-                # Set hard limit of 50 lines or 27000 code points, where it will split chunk even if not ending sentence
-                elif (len(currentChunk) >= 50 or currentCodePoints + textCodePoints > 27000):
+                    currentChunk = []       # Reset the current chunk
+                    currentCodePoints = 0   # Reset code points
+                # Set soft limit, where only splits chunk if ending sentence
+                elif (len(currentChunk) >= maxLines or currentCodePoints + textCodePoints > maxCodePoints) and text.endswith(('.', '. ','!','! ','?','? ', '."','." ')):
+                    # Soft cap so we can add the current text before closing the chunk
+                    currentChunk.append(text)
                     chunkedTexts.append(currentChunk)
-                    currentChunk = []
-                    currentCodePoints = 0
-                
+                    currentChunk = []       # Reset the current chunk
+                    currentCodePoints = 0   # Reset code points
+                    continue # Skip over the append and adding lines below
 
             currentChunk.append(text)
             currentCodePoints += textCodePoints

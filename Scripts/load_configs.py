@@ -30,6 +30,7 @@ class CloudConfig:
     use_fallback_google_translate: bool
     batch_tts_synthesize: bool
     google_project_id: str
+    google_translate_mode: GoogleTranslateMode
     deepl_api_key: str
     azure_speech_key: str
     azure_speech_region: str
@@ -47,6 +48,7 @@ class CloudConfig:
             use_fallback_google_translate=parse_bool_strict(config_dict['use_fallback_google_translate']),
             batch_tts_synthesize=parse_bool_strict(config_dict['batch_tts_synthesize']),
             google_project_id=config_dict['google_project_id'],
+            google_translate_mode=GoogleTranslateMode(config_dict['google_translate_mode'].lower()),
             deepl_api_key=config_dict['deepl_api_key'],
             azure_speech_key=config_dict['azure_speech_key'],
             azure_speech_region=config_dict['azure_speech_region'],

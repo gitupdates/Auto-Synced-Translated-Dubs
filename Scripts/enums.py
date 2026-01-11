@@ -9,6 +9,10 @@ class TranslateService(str, enum.Enum):
 
     def __str__(self):
         return self.value
+    
+class GoogleTranslateMode(str, enum.Enum):
+    NMT = "nmt",
+    LLM = "llm"
 
 class TTSService(str, enum.Enum):
     AZURE = "azure"
