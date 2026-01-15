@@ -102,6 +102,8 @@ class SubsDictKeys(str, enum.Enum):
     TTS_FilePath = "TTS_FilePath"
     TTS_FilePath_Trimmed = "TTS_FilePath_Trimmed"
     speed_factor = "speed_factor"
+    force_split_at_start = "force_split_at_start"
+    force_split_at_end = "force_split_at_end"
 
     def __str__(self):
         return self.value

@@ -13,6 +13,7 @@ print(f"------- 'Auto Synced Translated Dubs' script by ThioJoe - Release versio
 from Scripts.shared_imports import *
 import Scripts.TTS as TTS
 import Scripts.audio_builder as audio_builder
+import Scripts.utils as utils
 #import Scripts.auth as auth
 import Scripts.translate as translate
 
@@ -219,7 +220,96 @@ def manually_prepare_dictionary(dictionaryToPrep: SubtitleDictStr) -> SubtitleDi
     # Convert the keys to integers and return the dictionary
     return {int(k): v for k, v in dictionaryToPrep.items()}
 
+def make_dictionary_using_custom_timing(languageCode:str) -> SubtitleDict:
+    # Need to parse and define the text, translated_text, duration
+    customSubsDict: SubtitleDict = {}
+
+    # Find the file in OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER that ends with f"_{languageCode}.txt"
+    customTimingFilePath = None
+    for file in os.listdir(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER):
+        if file.lower().endswith(f"_{languageCode.lower()}.txt"):
+            customTimingFilePath = os.path.join(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER, file)
+            break
+    
+    if customTimingFilePath != None:
+        # Parse each line as <Starting Timecode>|<Ending Timestamp>|<Whatever sentence here.>
+        with open(customTimingFilePath, 'r', encoding='utf-8-sig') as f:
+            customTimingLines = f.readlines()
+        
+        previousStartMs:int = -1
+        previousEndMs:int = -1
+        for lineNum, line in enumerate(customTimingLines):
+            line = line.strip()
+            if '|' in line:
+                parts = line.split('|')
+                if len(parts) >= 3:
+                    startTimecode = parts[0].strip()
+                    endTimecode = parts[1].strip()
+                    subtitleText = '|'.join(parts[2:]).strip()  # In case '|' is in the text
+                    
+                    # Check if there's an asterisk in front of the start and/or end timecodes. 1 is true, 0 is false
+                    isForceSplitStart:int = 0
+                    isForceSplitEnd:int = 0
+                    
+                    if startTimecode.startswith('*'):
+                        startTimecode = startTimecode[1:].strip()
+                        isForceSplitStart = 1
+                    if endTimecode.startswith('*'):
+                        endTimecode = endTimecode[1:].strip()
+                        isForceSplitEnd = 1
+
+                    processedTime1 = utils.time_to_ms(startTimecode)
+                    processedTime2 = utils.time_to_ms(endTimecode)
+                    # processedTime2 = int(time2[0]) * 3600000 + int(time2[1]) * 60000 + int(time2[2].split(',')[0]) * 1000 + int(time2[2].split(',')[1])
+                    timeDifferenceMs = str(processedTime2 - processedTime1)
+                    
+                    addBufferMilliseconds = int(config.add_line_buffer_milliseconds)
+                    
+                    # Add the buffer if the timestamps are closed (right up next to each other)
+                    if addBufferMilliseconds > 0:
+                        
+                        # Check if a buffer of the desired amount already exists
+                        if previousEndMs != -1 and ( (processedTime1 - previousEndMs) <= (addBufferMilliseconds * 2) ):
+                            start_ms_buffered = str(processedTime1 + addBufferMilliseconds)
+                        else:
+                            start_ms_buffered = str(processedTime1)
+                            
+                        if previousStartMs != -1 and ( (previousStartMs - processedTime2) <= (addBufferMilliseconds * 2) ):
+                            end_ms_buffered = str(processedTime2 - addBufferMilliseconds)
+                        else:
+                            end_ms_buffered = str(processedTime2)
+                            
+                    else:
+                        start_ms_buffered = str(processedTime1)
+                        end_ms_buffered = str(processedTime2)
+                        
+                    duration_ms_buffered = str(int(end_ms_buffered) - int(start_ms_buffered))
+
+                    # Create entry in dictionary
+                    customSubsDict[lineNum + 1] = {
+                        SubsDictKeys.start_ms: str(processedTime1),
+                        SubsDictKeys.end_ms: str(processedTime2),
+                        SubsDictKeys.duration_ms: timeDifferenceMs,
+                        SubsDictKeys.text: subtitleText,
+                        SubsDictKeys.translated_text: subtitleText,
+                        SubsDictKeys.srt_timestamps_line: f"{startTimecode} --> {endTimecode}",
+                        SubsDictKeys.break_until_next: '0',  # Will adjust later,
+                        SubsDictKeys.start_ms_buffered: start_ms_buffered,
+                        SubsDictKeys.end_ms_buffered: end_ms_buffered,
+                        SubsDictKeys.duration_ms_buffered: duration_ms_buffered,
+                        SubsDictKeys.force_split_at_start: isForceSplitStart,
+                        SubsDictKeys.force_split_at_end: isForceSplitEnd
+                    }
+                    
+                    previousStartMs = processedTime1
+                    previousEndMs = processedTime2
+        # --- End for loop
+    # -- End If statement: customTimingFilePath None check
+
+    return customSubsDict
+
 def convert_dict_string_keys_to_int(dictionaryToPrep:SubtitleDictStr) -> SubtitleDict:
+    
     resultDict: SubtitleDict = {}
     for key, value in dictionaryToPrep.items():
         # Convert key to integer
@@ -248,7 +338,8 @@ def get_pretranslated_subs_dict(langData: dict[str, str]) -> SubtitleDict:
     
     # Check if any files ends with the specific language code and srt file extension
     for file in files:
-        if file.replace(' ', '').endswith(f"-{langData[LangDataKeys.translation_target_language]}.srt"):
+        if file.replace(' ', '').endswith(f"-{langData[LangDataKeys.translation_target_language]}.srt") \
+        or file.replace(' ', '').endswith(f"_{langData[LangDataKeys.translation_target_language]}.srt"):
             # If so, open the file and read the lines into a list
             with open(f"{OUTPUT_FOLDER}/{file}", 'r', encoding='utf-8-sig') as f:
                 pretranslatedSubLines = f.readlines()
@@ -256,7 +347,7 @@ def get_pretranslated_subs_dict(langData: dict[str, str]) -> SubtitleDict:
 
             # Parse the srt file using function
             preTranslatedDict: SubtitleDictStr = parse_srt_file(pretranslatedSubLines, preTranslated=True)
-
+            
             # Convert the keys to integers
             preTranslatedDictInt: SubtitleDict = manually_prepare_dictionary(preTranslatedDict)
 
@@ -292,6 +383,14 @@ def process_language(langData:dict[str, str], processedCount:int, totalLanguages
         # Runs through translation function and skips translation process, but still combines subtitles and prints srt file for native language
         individualLanguageSubsDict: SubtitleDict = translate.translate_dictionary(originalSubDictCopy, langDict, skipTranslation=True, forceNativeSRTOutput=True)
 
+    # Check if the output folder has a custom timing folder, and if there's a file in there for the current language
+    elif os.path.exists(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER) \
+        and any(f.lower().endswith(f"_{langDict[LangDictKeys.languageCode].lower()}.txt") for f in os.listdir(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER)) \
+        and config.prefer_custom_timing == True:
+            print(f"Using custom sentence timing as preferred...")
+            customSentencesSubsDict = make_dictionary_using_custom_timing(langDict[LangDictKeys.languageCode])
+            individualLanguageSubsDict: SubtitleDict = translate.translate_dictionary(customSentencesSubsDict, langDict, skipTranslation=True)
+            
     elif config.skip_translation == False:
         # Translate
         individualLanguageSubsDict = translate.translate_dictionary(originalSubDictCopy, langDict, skipTranslation=config.skip_translation)

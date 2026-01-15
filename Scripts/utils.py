@@ -95,3 +95,12 @@ def getFirstAvailableFileName(directoryPath:str, fileNameBase:str, extension:str
         i += 1
 
     return filePath
+
+def time_to_ms(time_str:str) -> int:
+    try:
+        time_str = time_str.replace('.', ',')
+        hours, minutes, rest = time_str.split(':')
+        seconds, milliseconds = rest.split(',')
+        return (int(hours) * 3600000) + (int(minutes) * 60000) + (int(seconds) * 1000) + int(milliseconds)
+    except ValueError:
+        return 0

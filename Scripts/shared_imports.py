@@ -32,10 +32,16 @@ if cloudConfig.tts_service == "elevenlabs":
 # ----- Create constants ------
 ORIGINAL_VIDEO_PATH = batchConfig['SETTINGS']['original_video_file_path']
 ORIGINAL_VIDEO_NAME = os.path.splitext(os.path.basename(ORIGINAL_VIDEO_PATH))[0]
+
 OUTPUT_DIRECTORY = 'Outputs'
-OUTPUT_YTSYNCED_DIRECTORY = 'YouTube Auto-Synced Subtitles'
 OUTPUT_FOLDER = os.path.join(OUTPUT_DIRECTORY , ORIGINAL_VIDEO_NAME)
+
+OUTPUT_YTSYNCED_DIRECTORY = 'YouTube Auto-Synced Subtitles'
 OUTPUT_YTSYNCED_FOLDER = os.path.join(OUTPUT_FOLDER, OUTPUT_YTSYNCED_DIRECTORY)
+
+OUTPUT_CUSTOM_SENTENCE_TIMING_DIRECTORY = 'Custom_Sentence_Timing'
+OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER = os.path.join(OUTPUT_FOLDER, OUTPUT_CUSTOM_SENTENCE_TIMING_DIRECTORY)
+
 
 # Fix original video path if debug mode
 if config.debug_mode and (ORIGINAL_VIDEO_PATH == '' or ORIGINAL_VIDEO_PATH.lower() == 'none'):

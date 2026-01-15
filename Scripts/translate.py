@@ -338,35 +338,31 @@ def translate_dictionary(inputSubsDict:SubtitleDict, langDict:dict[LangDictKeys,
     targetLanguage:str = langDict[LangDictKeys.targetLanguage]
     translateService = langDict[LangDictKeys.translateService]
     formality:str = langDict[LangDictKeys.formality]
-        
-    # Create a container for all the text to be translated
-    textToTranslate:list[str] = []
     
-    # Set Custom Tag if supported by the translation service
-    customNoTranslateTag:str
-    if translateService == TranslateService.DEEPL:
-        customNoTranslateTag:str = 'zzz'
-    else:
-        customNoTranslateTag = ''
-
-    for key in inputSubsDict:
-        originalText:str = str(inputSubsDict[key][SubsDictKeys.text]) # This value should always be text, but cast to string just to satisfy strict typing since it's technically str|int
-        # Add any 'notranslate' tags to the text
-        processedText:str = ''
-        processedText = add_notranslate_tags_from_notranslate_file(originalText, dontTranslateList, customNoTranslateTag)
-        processedText = add_notranslate_tags_from_notranslate_file(processedText, urlList, customNoTranslateTag)
-        processedText = add_notranslate_tags_for_manual_translations(processedText, targetLanguage, customNoTranslateTag)
-
-        # Add the text to the list of text to be translated
-        if processedText != '':
-            textToTranslate.append(processedText)
-   
-    #Calculate the total number of utf-8 codepoints - No longer needed, but keeping just in case
-    # codepoints = 0
-    # for text in textToTranslate:
-    #     codepoints += len(text.encode("utf-8"))
-      
     if skipTranslation == False:
+        # Create a container for all the text to be translated
+        textToTranslate:list[str] = []
+        
+        # Set Custom Tag if supported by the translation service
+        customNoTranslateTag:str
+        if translateService == TranslateService.DEEPL:
+            customNoTranslateTag:str = 'zzz'
+        else:
+            customNoTranslateTag = ''
+
+        for key in inputSubsDict:
+            originalText:str = str(inputSubsDict[key][SubsDictKeys.text]) # This value should always be text, but cast to string just to satisfy strict typing since it's technically str|int
+            # Add any 'notranslate' tags to the text
+            processedText:str = ''
+            processedText = add_notranslate_tags_from_notranslate_file(originalText, dontTranslateList, customNoTranslateTag)
+            processedText = add_notranslate_tags_from_notranslate_file(processedText, urlList, customNoTranslateTag)
+            processedText = add_notranslate_tags_for_manual_translations(processedText, targetLanguage, customNoTranslateTag)
+
+            # Add the text to the list of text to be translated
+            if processedText != '':
+                textToTranslate.append(processedText)
+      
+
         maxCodePoints = 999999 # Placeholder
         maxCodePointsHard = 999999
         maxLines = 99999 # Placeholder
@@ -537,6 +533,11 @@ def translate_dictionary(inputSubsDict:SubtitleDict, langDict:dict[LangDictKeys,
                     f.write(f"DEBUG: start_ms_buffered = {combinedProcessedDict[key][SubsDictKeys.start_ms_buffered]}" + '\n')
                     f.write(f"DEBUG: end_ms_buffered = {combinedProcessedDict[key][SubsDictKeys.end_ms_buffered]}" + '\n')
                     f.write(f"DEBUG: Number of chars = {len(str(combinedProcessedDict[key][SubsDictKeys.translated_text]))}" + '\n')
+                    # If it's a force split
+                    if combinedProcessedDict[key].get(SubsDictKeys.force_split_at_start, 0) == 1:
+                        f.write(f"DEBUG: FORCES SPLIT AT START" + '\n')
+                    if combinedProcessedDict[key].get(SubsDictKeys.force_split_at_end, 0) == 1:
+                        f.write(f"DEBUG: FORCES SPLIT AT END" + '\n')
                     f.write('\n')
 
     # FOR TESTING - Put all translated text into single string
@@ -720,7 +721,7 @@ def combine_subtitles_advanced(inputDict:SubtitleDict, maxCharacters:int=200):
     gapThreshold:int = config.subtitle_gap_threshold_milliseconds
     charRateGoal:float
     
-    if (config.speech_rate_goal == 'auto'):
+    if (isinstance(config.speech_rate_goal, str) and config.speech_rate_goal.lower() == 'auto'):
         # Calculate average char rate goal by dividing the total number of characters by the total duration in seconds from the last subtitle timetsamp
         totalCharacters = 0
         totalDuration = 0
@@ -758,7 +759,7 @@ def combine_subtitles_advanced(inputDict:SubtitleDict, maxCharacters:int=200):
     # Convert the list back to a dictionary then return it
     return dict(enumerate(entryList, start=1))
 
-def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, gapThreshold:int, maxCharacters:int):   
+def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, gapThreshold:int, maxCharacters:int):
     ## Don't change these, they are not options, they are for keeping track ##
     # Want to restart the loop if a change is made, so use this variable, otherwise break only if the end is reached
     reachedEndOfList = False
@@ -807,19 +808,25 @@ def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, 
                 # If the diff is positive, then it is lower than the current char_rate
                 try:
                     nextCharRate:float|None = float(entryListLocal[i+1][SubsDictKeys.char_rate])
-                    nextDiff:float|None = float(data[SubsDictKeys.char_rate]) - nextCharRate
+                    diff_currRateMinusNext:float|None = float(data[SubsDictKeys.char_rate]) - nextCharRate
                 except IndexError:
                     considerNext = False
                     nextCharRate = None
-                    nextDiff = None
+                    diff_currRateMinusNext = None
                 try:
                     prevCharRate:float|None = float(entryListLocal[i-1][SubsDictKeys.char_rate])
-                    prevDiff:float|None  = float(data[SubsDictKeys.char_rate]) - prevCharRate
+                    diff_currRateMinusPrev:float|None  = float(data[SubsDictKeys.char_rate]) - prevCharRate
                 except IndexError:
                     considerPrev = False
                     prevCharRate = None
-                    prevDiff = None
+                    diff_currRateMinusPrev = None
                     
+                # Check if the next or previous item has the force_split_at_start or force_split_at_end properties and if they are set to true (1)
+                if considerNext and entryListLocal[i+1].get(SubsDictKeys.force_split_at_start, 0) == 1:
+                    considerNext = False
+                if considerPrev and entryListLocal[i-1].get(SubsDictKeys.force_split_at_end, 0) == 1:
+                    considerPrev = False
+
             else:
                 continue
 
@@ -832,9 +839,13 @@ def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, 
                 entryListLocal[i][SubsDictKeys.duration_ms] = int(entryListLocal[i+1][SubsDictKeys.end_ms]) - int(entryListLocal[i][SubsDictKeys.start_ms])
                 entryListLocal[i][SubsDictKeys.duration_ms_buffered] = int(entryListLocal[i+1][SubsDictKeys.end_ms_buffered]) - int(entryListLocal[i][SubsDictKeys.start_ms_buffered])
                 entryListLocal[i][SubsDictKeys.srt_timestamps_line] = str(entryListLocal[i][SubsDictKeys.srt_timestamps_line]).split(' --> ')[0] + ' --> ' + str(entryListLocal[i+1][SubsDictKeys.srt_timestamps_line]).split(' --> ')[1]
+                # For force split at start value, use start of current one, for end use end of next one
+                entryListLocal[i][SubsDictKeys.force_split_at_end] = entryListLocal[i+1].get(SubsDictKeys.force_split_at_end, 0)
+                entryListLocal[i][SubsDictKeys.force_split_at_start] = entryListLocal[i].get(SubsDictKeys.force_split_at_start, 0)
                 del entryListLocal[i+1]
 
             def combine_with_prev():
+                # Remember to set properties on entryListLocal[i-1] because entryListLocal[i] gets deleted
                 entryListLocal[i-1][SubsDictKeys.text] = str(entryListLocal[i-1][SubsDictKeys.text]) + ' ' + str(entryListLocal[i][SubsDictKeys.text])
                 entryListLocal[i-1][SubsDictKeys.translated_text] = str(entryListLocal[i-1][SubsDictKeys.translated_text]) + ' ' + str(entryListLocal[i][SubsDictKeys.translated_text])
                 entryListLocal[i-1][SubsDictKeys.end_ms] = entryListLocal[i][SubsDictKeys.end_ms]
@@ -842,19 +853,38 @@ def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, 
                 entryListLocal[i-1][SubsDictKeys.duration_ms] = int(entryListLocal[i][SubsDictKeys.end_ms]) - int(entryListLocal[i-1][SubsDictKeys.start_ms])
                 entryListLocal[i-1][SubsDictKeys.duration_ms_buffered] = int(entryListLocal[i][SubsDictKeys.end_ms_buffered]) - int(entryListLocal[i-1][SubsDictKeys.start_ms_buffered])
                 entryListLocal[i-1][SubsDictKeys.srt_timestamps_line] = str(entryListLocal[i-1][SubsDictKeys.srt_timestamps_line]).split(' --> ')[0] + ' --> ' + str(entryListLocal[i][SubsDictKeys.srt_timestamps_line]).split(' --> ')[1]
+                # For force split at start value, use start of previous one, for end use end of current one
+                entryListLocal[i-1][SubsDictKeys.force_split_at_end] = entryListLocal[i].get(SubsDictKeys.force_split_at_end, 0)
+                entryListLocal[i-1][SubsDictKeys.force_split_at_start] = entryListLocal[i-1].get(SubsDictKeys.force_split_at_start, 0)
                 del entryListLocal[i]
             
             thisCharRate:float = float(data[SubsDictKeys.char_rate])
+            currentGapThreshold:int = gapThreshold
             # If user has set option to increase maximum characters when speeds are extreme. Increase by various amounts depending on how extreme
             if config.increase_max_chars_for_extreme_speeds == True:
-                if thisCharRate > 28:
-                    tempMaxChars = maxCharacters + 100
-                elif thisCharRate > 27:
-                    tempMaxChars = maxCharacters + 85
-                elif thisCharRate > 26:
-                    tempMaxChars = maxCharacters + 70
-                elif thisCharRate > 25:
-                    tempMaxChars = maxCharacters + 50
+                # if thisCharRate > 28:
+                #     tempMaxChars = maxCharacters + 100
+                # elif thisCharRate > 27:
+                #     tempMaxChars = maxCharacters + 85
+                # elif thisCharRate > 26:
+                #     tempMaxChars = maxCharacters + 70
+                # elif thisCharRate > 25:
+                #     tempMaxChars = maxCharacters + 50
+                # else:
+                #     tempMaxChars = maxCharacters
+                
+                if abs(thisCharRate - charRateGoal) >= 10:
+                    tempMaxChars = round(maxCharacters * 1.75)
+                    currentGapThreshold = gapThreshold * 5 
+                elif abs(thisCharRate - charRateGoal) >= 9:
+                    tempMaxChars = round(maxCharacters * 1.6)
+                    currentGapThreshold = gapThreshold * 4
+                elif abs(thisCharRate - charRateGoal) >= 8:
+                    tempMaxChars = round(maxCharacters * 1.50)
+                    currentGapThreshold = gapThreshold * 3
+                elif abs(thisCharRate - charRateGoal) >= 7:
+                    tempMaxChars = round(maxCharacters * 1.25)
+                    currentGapThreshold = gapThreshold * 2
                 else:
                     tempMaxChars = maxCharacters
             else:
@@ -864,21 +894,36 @@ def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, 
             if thisCharRate > charRateGoal:
                 # Check to ensure next/previous rates are lower than current rate, and the combined entry is not too long, and the gap between entries is not too large
                 # Need to add check for considerNext and considerPrev first, because if run other checks when there is no next/prev value to check, it will throw an error
-                if considerNext == False or not nextDiff or nextDiff < 0 or (int(entryListLocal[i][SubsDictKeys.break_until_next]) >= gapThreshold) or (len(str(entryListLocal[i][SubsDictKeys.translated_text])) + len(str(entryListLocal[i+1][SubsDictKeys.translated_text])) > tempMaxChars):
-                    considerNext = False
+                if considerNext == False \
+                    or not diff_currRateMinusNext \
+                    or diff_currRateMinusNext < 0 \
+                    or (int(entryListLocal[i][SubsDictKeys.break_until_next]) >= currentGapThreshold) \
+                    or (len(str(entryListLocal[i][SubsDictKeys.translated_text])) + len(str(entryListLocal[i+1][SubsDictKeys.translated_text])) > tempMaxChars):
+                        considerNext = False
                 try:
-                    if considerPrev == False or not prevDiff or prevDiff < 0 or (int(entryListLocal[i-1][SubsDictKeys.break_until_next]) >= gapThreshold) or (len(str(entryListLocal[i-1][SubsDictKeys.translated_text])) + len(str(entryListLocal[i][SubsDictKeys.translated_text])) > tempMaxChars):
-                        considerPrev = False
+                    if considerPrev == False \
+                        or not diff_currRateMinusPrev \
+                        or diff_currRateMinusPrev < 0 \
+                        or (int(entryListLocal[i-1][SubsDictKeys.break_until_next]) >= currentGapThreshold) \
+                        or (len(str(entryListLocal[i-1][SubsDictKeys.translated_text])) + len(str(entryListLocal[i][SubsDictKeys.translated_text])) > tempMaxChars):
+                            considerPrev = False
                 except TypeError:
                     considerPrev = False
 
             elif thisCharRate < charRateGoal:
                 # Check to ensure next/previous rates are higher than current rate
-                if considerNext == False or not nextDiff or nextDiff > 0 or (int(entryListLocal[i][SubsDictKeys.break_until_next]) >= gapThreshold) or (len(str(entryListLocal[i][SubsDictKeys.translated_text])) + len(str(entryListLocal[i+1][SubsDictKeys.translated_text])) > tempMaxChars):
-                    considerNext = False
+                if considerNext == False \
+                    or not diff_currRateMinusNext \
+                    or diff_currRateMinusNext > 0 \
+                    or (int(entryListLocal[i][SubsDictKeys.break_until_next]) >= currentGapThreshold) \
+                    or (len(str(entryListLocal[i][SubsDictKeys.translated_text])) + len(str(entryListLocal[i+1][SubsDictKeys.translated_text])) > tempMaxChars):
+                        considerNext = False
                 try:
-                    if considerPrev == False or not prevDiff or prevDiff > 0 or (int(entryListLocal[i-1][SubsDictKeys.break_until_next]) >= gapThreshold) or (len(str(entryListLocal[i-1][SubsDictKeys.translated_text])) + len(str(entryListLocal[i][SubsDictKeys.translated_text])) > tempMaxChars):
-                        considerPrev = False
+                    if considerPrev == False \
+                        or not diff_currRateMinusPrev or diff_currRateMinusPrev > 0 \
+                        or (int(entryListLocal[i-1][SubsDictKeys.break_until_next]) >= currentGapThreshold) \
+                        or (len(str(entryListLocal[i-1][SubsDictKeys.translated_text])) + len(str(entryListLocal[i][SubsDictKeys.translated_text])) > tempMaxChars):
+                            considerPrev = False
                 except TypeError:
                     considerPrev = False
             else:
@@ -912,10 +957,19 @@ def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, 
             
             # Case where char_rate is lower than goal
             if thisCharRate > charRateGoal:
-                # If both are to be considered, then choose the one with the lower char_rate.
+                # If both are to be considered, both choose be less than charRateGoal. So choose the one with the lower char_rate.
                 if considerNext and considerPrev:
-                    # Choose lower char rate
-                    if nextDiff and prevDiff and (nextDiff < prevDiff):
+                    # Choose lower char rate. Try using next and previous char rate directly it's easier to understand, only fall back to diffs
+                    if isinstance(nextCharRate, float) and isinstance(prevCharRate, float) and (nextCharRate < prevCharRate):
+                        combine_with_next()
+                        noMorePossibleCombines = False
+                        break
+                    elif isinstance(nextCharRate, float) and isinstance(prevCharRate, float) and (nextCharRate > prevCharRate):
+                        combine_with_prev()
+                        noMorePossibleCombines = False
+                        break
+                    # Not sure we'll ever get to here, but leave them because it's what we had before. Kind of confusing to use the diff variables
+                    elif diff_currRateMinusNext and diff_currRateMinusPrev and (diff_currRateMinusNext < diff_currRateMinusPrev):
                         combine_with_next()
                         noMorePossibleCombines = False
                         break
@@ -939,10 +993,19 @@ def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, 
             
             # Case where char_rate is lower than goal
             elif thisCharRate < charRateGoal:
-                # If both are to be considered, then choose the one with the higher char_rate.
-                if considerNext and considerPrev:                  
-                    # Choose higher char rate
-                    if nextDiff and prevDiff and (nextDiff > prevDiff):
+                # If both are to be considered, both should be higher than charRateGoal. So choose the one with the higher char_rate.
+                if considerNext and considerPrev:
+                    # Choose higher char rate. Try using next and previous char rate directly it's easier to understand, only fall back to diffs
+                    if isinstance(nextCharRate, float) and isinstance(prevCharRate, float) and (nextCharRate > prevCharRate):
+                        combine_with_next()
+                        noMorePossibleCombines = False
+                        break
+                    elif isinstance(nextCharRate, float) and isinstance(prevCharRate, float) and (nextCharRate < prevCharRate):
+                        combine_with_prev()
+                        noMorePossibleCombines = False
+                        break
+                    # Not sure we'll ever get to here, but leave them because it's what we had before. Kind of confusing to use the diff variables
+                    elif diff_currRateMinusNext and diff_currRateMinusPrev and (diff_currRateMinusNext > diff_currRateMinusPrev):
                         combine_with_next()
                         noMorePossibleCombines = False
                         break
@@ -982,5 +1045,5 @@ def calc_list_speaking_rates(inputList:list[SubtitleEntry], charRateGoal:float, 
         # Calculate the number of characters per second based on the duration of the entry
         tempList[i][SubsDictKeys.char_rate] = round(len(str(tempList[i][dictKey])) / (int(tempList[i][SubsDictKeys.duration_ms]) / 1000), 2)
         # Calculate the difference between the current char_rate and the goal char_rate - Absolute Value
-        tempList[i][SubsDictKeys.char_rate_diff] = abs(round(float(tempList[i][SubsDictKeys.char_rate]) - charRateGoal, 2))
+        tempList[i][SubsDictKeys.char_rate_diff] = round(float(tempList[i][SubsDictKeys.char_rate]) - charRateGoal, 2)
     return tempList

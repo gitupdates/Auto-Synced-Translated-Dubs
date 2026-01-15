@@ -63,6 +63,7 @@ class CloudConfig:
 class Config:
     skip_translation: bool
     skip_synthesize: bool
+    prefer_custom_timing: bool
     stop_after_translation: bool
     original_language: str
     formality_preference: FormalityPreference
@@ -95,6 +96,7 @@ class Config:
         return cls(
             skip_translation=parse_bool_strict(config_dict['skip_translation']),
             skip_synthesize=parse_bool_strict(config_dict['skip_synthesize']),
+            prefer_custom_timing=parse_bool_strict(config_dict.get('prefer_custom_timing', 'True')),
             stop_after_translation=parse_bool_strict(config_dict['stop_after_translation']),
             original_language=config_dict['original_language'],
             formality_preference=FormalityPreference(config_dict['formality_preference']),
