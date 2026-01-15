@@ -160,15 +160,21 @@ def add_marker_and_convert_to_string(textList:list[str], customMarkerTag:str, en
     # Mostly for google which limits how many it will auto add. But it adds start and closing of tags as a termination so we need to only add the closing tag at the end of a sentence.
     currentOpenTagsCount = 0 
     
+    googleMode = (cloudConfig.translate_service == TranslateService.GOOGLE) # If using google we need to close the tags at the end of the sentences.
+    
     for i, text in enumerate(textList):
         # If last line don't add the tag
         if i == len(textList) - 1:
             combinedString += text
         else:
-            combinedString += text + f"{customMarkerTag}" # Before I had a space before the custom tag but will try not doing that
-            currentOpenTagsCount += 1
+            if googleMode == True:
+                combinedString += text + f"{customMarkerTag} "
+                currentOpenTagsCount += 1
+            else:
+                combinedString += text + f"{customMarkerTag}{endingTag} "
+            
         # If the text line ends with a period, dump and closing tags
-        if endingTag and ends_with_sentence_terminator(text):
+        if googleMode and endingTag and endingTag != "" and ends_with_sentence_terminator(text):
             combinedString += (endingTag * currentOpenTagsCount)
             currentOpenTagsCount = 0
             
@@ -293,13 +299,22 @@ def translate_with_google_and_process(textList:list[str], targetLanguage:str) ->
 def translate_with_deepl_and_process(textList:list[str], targetLanguage:str, formality:str|None=None, customNoTranslateTag:str='zzz'):
     # Create combined string of all the text in the textList, but add custom marker tags <zzz> to the end to note where the original text was split. But don't add to last line.
     # In future can possibly add information such as index to tag, such as <zzz=#>.
-    combinedChunkTextString = add_marker_and_convert_to_string(textList, customMarkerTag='<xxx>')
-            
+    markerTagStart='<xxx>'
+    markerTagEnd='</xxx>'
+    combinedChunkTextString = add_marker_and_convert_to_string(textList, customMarkerTag=markerTagStart, endingTag=markerTagEnd)
+
     # Put string into list by itself, as apparently required by DeepL API
     textListToSend = [combinedChunkTextString]
     
     # Send the Request, then extract translated text as string from the response
-    result = auth.DEEPL_API.translate_text(textListToSend, target_lang=targetLanguage, formality=formality, tag_handling='xml', ignore_tags=[customNoTranslateTag, 'xxx'])
+    result = auth.DEEPL_API.translate_text(
+        textListToSend, 
+        target_lang=targetLanguage, 
+        formality=formality, 
+        tag_handling='xml', 
+        ignore_tags=[customNoTranslateTag, 'xxx'], 
+        tag_handling_version="v2"
+        )
     # Check if result is a list or a single TextResult
     if isinstance(result, list):
         translatedText = result[0].text
@@ -308,11 +323,11 @@ def translate_with_deepl_and_process(textList:list[str], targetLanguage:str, for
     
     # Handle weird quirk of DeepL where it adds parenthesis around the tag sometimes
     # Pattern to find parentheses around the custom tag with potential spaces. Also handles full width parenthesis
-    pattern = r'[（(]\s*<xxx>\s*[）)]'
-    translatedText = re.sub(pattern, ' <xxx>', translatedText)
+    pattern = rf'[（(]\s*{markerTagStart}{markerTagEnd}\s*[）)]'
+    translatedText = re.sub(pattern, f" {markerTagStart}{markerTagEnd}", translatedText)
     
     # Split the translated text into chunks based on the custom marker tags, and remove the tags
-    translatedTextsList = split_and_clean_marked_combined_string(translatedText, customMarkerTag='<xxx>')
+    translatedTextsList = split_and_clean_marked_combined_string(translatedText, customMarkerTag=f"{markerTagStart}{markerTagEnd}")
    
     # Extract the translated texts from the response and process them
     translatedProcessedTextsList = [process_response_text(translatedTextsList[i], targetLanguage, customNoTranslateTag=customNoTranslateTag) for i in range(len(translatedTextsList))]
@@ -700,7 +715,7 @@ def set_translation_info(languageBatchDict:dict[str, Any]) -> dict[str, dict[str
 
 
 #======================================== Combine Subtitle Lines ================================================
-def combine_subtitles_advanced(inputDict:dict[int, dict[str, str|int|float]], maxCharacters:int=200):
+def combine_subtitles_advanced(inputDict:SubtitleDict, maxCharacters:int=200):
     # Set gap threshold, the maximum gap between subtitles to combine
     gapThreshold:int = config.subtitle_gap_threshold_milliseconds
     charRateGoal:float
@@ -731,7 +746,7 @@ def combine_subtitles_advanced(inputDict:dict[int, dict[str, str|int|float]], ma
     # Don't change this, it is not an option, it is for keeping track
     noMorePossibleCombines:bool = False
     # Convert dictionary to list of dictionaries of the values
-    entryList:list[dict[str, str|int|float]] = []
+    entryList:list[SubtitleEntry] = []
 
     for key, value in inputDict.items():
         value[SubsDictKeys.originalIndex] = int(key)-1
@@ -743,7 +758,7 @@ def combine_subtitles_advanced(inputDict:dict[int, dict[str, str|int|float]], ma
     # Convert the list back to a dictionary then return it
     return dict(enumerate(entryList, start=1))
 
-def combine_single_pass(entryListLocal:list[dict[str, str|int|float]], charRateGoal:float, gapThreshold:int, maxCharacters:int):   
+def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, gapThreshold:int, maxCharacters:int):   
     ## Don't change these, they are not options, they are for keeping track ##
     # Want to restart the loop if a change is made, so use this variable, otherwise break only if the end is reached
     reachedEndOfList = False
@@ -955,13 +970,13 @@ def combine_single_pass(entryListLocal:list[dict[str, str|int|float]], charRateG
 #----------------------------------------------------------------------
 
 # Calculate the number of characters per second for each subtitle entry
-def calc_dict_speaking_rates(inputDict:Dict[str, dict[str, str|int|float]], dictKey:str=SubsDictKeys.translated_text):  
+def calc_dict_speaking_rates(inputDict:SubtitleDictStr, dictKey:str=SubsDictKeys.translated_text):  
     tempDict = copy.deepcopy(inputDict)
     for key, value in tempDict.items():
         tempDict[key][SubsDictKeys.char_rate] = round(len(str(value[dictKey])) / (int(value[SubsDictKeys.duration_ms]) / 1000), 2)
     return tempDict
 
-def calc_list_speaking_rates(inputList:list[Dict[str, str|int|float]], charRateGoal:float, dictKey:str=SubsDictKeys.translated_text): 
+def calc_list_speaking_rates(inputList:list[SubtitleEntry], charRateGoal:float, dictKey:str=SubsDictKeys.translated_text): 
     tempList = copy.deepcopy(inputList)
     for i in range(len(tempList)):
         # Calculate the number of characters per second based on the duration of the entry
