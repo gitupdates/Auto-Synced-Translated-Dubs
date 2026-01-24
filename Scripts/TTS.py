@@ -12,6 +12,7 @@ import re
 from urllib.request import urlopen
 import aiohttp
 import asyncio
+import html
 from typing import Optional, Any, Dict, cast
 
 from Scripts.shared_imports import *
@@ -272,6 +273,9 @@ def synthesize_text_azure(text:str, duration:str|int|float, voiceName:str, langu
     # Set string for tag to set leading and trailing silence times to zero
     leadSilenceTag = '<mstts:silence  type="Leading-exact" value="0ms"/>'
     tailSilenceTag = '<mstts:silence  type="Tailing-exact" value="0ms"/>'
+    
+    # Need to escape for XML, but do it before we add our own SSML Tags
+    text = html.escape(text)
 
     # Process text using pronunciation customization set by user
     text = add_all_pronunciation_overrides(text)
@@ -350,7 +354,10 @@ def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKey
 
             # Set string for tag to set leading and trailing silence times to zero
             leadSilenceTag = '<mstts:silence  type="Leading-exact" value="0ms"/>'
-            tailSilenceTag = '<mstts:silence  type="Tailing-exact" value="0ms"/>'    
+            tailSilenceTag = '<mstts:silence  type="Tailing-exact" value="0ms"/>'
+            
+            # Need to escape for XML, but do it before we add our own SSML Tags
+            text = html.escape(text)
 
             # Process text using pronunciation customization set by user
             text = add_all_pronunciation_overrides(text)
