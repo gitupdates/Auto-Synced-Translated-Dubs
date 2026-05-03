@@ -496,11 +496,13 @@ def translate_dictionary(inputSubsDict:SubtitleDict, langDict:dict[LangDictKeys,
     if skipTranslation == False or config.debug_mode == True or forceNativeSRTOutput == True:
         # Use video file name to use in the name of the translate srt file, also display regular language name
         lang = langcodes.get(targetLanguage).display_name()
-
-        if forceNativeSRTOutput:
-            translatedSrtFileName = pathlib.Path(ORIGINAL_VIDEO_PATH).stem + f"- Original_Combined - {lang} - {targetLanguage}.srt"
+        
+        # Label this srt file as the one equivalent to the TTS synthesized speech
+        if config.reflow_translated_subtitles or forceNativeSRTOutput: 
+            translatedSrtFileName = pathlib.Path(ORIGINAL_VIDEO_PATH).stem + f"- TTS - {lang} - {targetLanguage}.srt"
         else:
             translatedSrtFileName = pathlib.Path(ORIGINAL_VIDEO_PATH).stem + f" - {lang} - {targetLanguage}.srt"
+            
         # Set path to save translated srt file
         translatedSrtFileName = os.path.join(OUTPUT_FOLDER, translatedSrtFileName)
         
