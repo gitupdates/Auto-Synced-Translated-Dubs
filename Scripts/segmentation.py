@@ -108,10 +108,12 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         print(f"  > WARNING: [Lang: {langCode}] No word boundaries found in TTS data. Cannot create reflowed SRT subtitles. The voice for this language may not support word boundaries.")
         return None
 
-    # Group words into subtitle entries targeting MAX_LINES of ~MAX_CHARS_PER_LINE chars each
-    MAX_CHARS_PER_LINE = 42
+    # Group words into subtitle entries
+    MAX_CHARS_PER_LINE_SOFT = 42
+    MAX_CHARS_PER_LINE_HARD = 50
     MAX_LINES = 2
-    MAX_CHARS = MAX_CHARS_PER_LINE * MAX_LINES
+    MAX_CHARS_SOFT = MAX_CHARS_PER_LINE_SOFT * MAX_LINES
+    MAX_CHARS_HARD = MAX_CHARS_PER_LINE_HARD * MAX_LINES
 
     subtitle_groups: list[list[dict]] = []
     current_group: list[dict] = []
@@ -124,7 +126,7 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         word = boundary["text"]
         add_len = len(word) + (1 if current_group else 0)  # +1 for space separator
 
-        if current_group and (current_len + add_len) > MAX_CHARS:
+        if current_group and (current_len + add_len) > MAX_CHARS_SOFT:
             subtitle_groups.append(current_group)
             current_group = [boundary]
             current_len = len(word)
@@ -154,7 +156,7 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         
         if any(first_word.endswith(ender) for ender in CLAUSE_ENDERS):
             prev_text_len = sum(len(w["text"]) for w in prev_group) + len(prev_group) - 1
-            if prev_text_len + 1 + len(first_word) <= MAX_CHARS + 10: # +10 grace for formatting
+            if prev_text_len + 1 + len(first_word) <= MAX_CHARS_HARD:
                 prev_group.append(curr_group.pop(0))
                 if not curr_group:
                     subtitle_groups.pop(i)
@@ -182,10 +184,12 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         is_clause_ender = any(last_word.endswith(ender) for ender in CLAUSE_ENDERS)
         
         if is_clause_starter and not is_clause_ender and len(last_word) <= SHORT_WORD_THRESHOLD:
-            next_group.insert(0, curr_group.pop(-1))
-            if not curr_group:
-                subtitle_groups.pop(i)
-                continue
+            next_text_len = sum(len(w["text"]) for w in next_group) + len(next_group) - 1
+            if next_text_len + 1 + len(last_word) <= MAX_CHARS_HARD:
+                next_group.insert(0, curr_group.pop(-1))
+                if not curr_group:
+                    subtitle_groups.pop(i)
+                    continue
         i += 1
     # ----------------------------------------------------------------------
 
@@ -197,30 +201,31 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         s = ms // 1000;    ms %= 1000
         return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
-    # Helper: wrap a group of word dicts into lines of at most max_line_chars
-    def wrap_words(words: list[dict], max_line_chars: int) -> str:
-        lines: list[str] = []
-        line_words: list[str] = []
-        line_len = 0
-        for idx, w in enumerate(words):
-            word = w["text"]
-            add = len(word) + (1 if line_words else 0)
-            
-            is_last_word = (idx == len(words) - 1)
-            
-            # Allow slight overflow for the last word to avoid dangling single-word lines
-            if line_words and line_len + add > max_line_chars and not (is_last_word and line_len + add <= max_line_chars + 10):
+    # Helper: wrap a group of word dicts into lines, preferring soft limit but allowing hard limit to maintain max lines
+    def wrap_words(words: list[dict], soft_limit: int, hard_limit: int, max_lines: int) -> str:
+        for limit in range(soft_limit, hard_limit + 1):
+            lines: list[str] = []
+            line_words: list[str] = []
+            line_len = 0
+            for w in words:
+                word = w["text"]
+                add = len(word) + (1 if line_words else 0)
+                if line_words and line_len + add > limit:
+                    lines.append(' '.join(line_words))
+                    line_words = [word]
+                    line_len = len(word)
+                else:
+                    line_words.append(word)
+                    line_len += add
+            if line_words:
                 lines.append(' '.join(line_words))
-                line_words = [word]
-                line_len = len(word)
-            else:
-                line_words.append(word)
-                line_len += add
-        if line_words:
-            lines.append(' '.join(line_words))
+            
+            # If we successfully wrapped within the allowed number of lines, return it
+            if len(lines) <= max_lines:
+                return '\n'.join(lines)
+                
+        # If it still exceeds, just return the hard_limit wrapped version
         return '\n'.join(lines)
-    
-    # ------------------------------------------------------------------
     
     finalFullSrtContents:str = ""
     reflowed_transcript:str = "" # To compare original text to reflowed to ensure punctuation was correct
@@ -235,7 +240,7 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
             if group_end_ms > next_start:
                 group_end_ms = max(group_start_ms, next_start - 1)
                 
-        text = wrap_words(group, MAX_CHARS_PER_LINE)
+        text = wrap_words(group, MAX_CHARS_PER_LINE_SOFT, MAX_CHARS_PER_LINE_HARD, MAX_LINES)
         finalFullSrtContents += f"{i}\n{ms_to_srt(group_start_ms)} --> {ms_to_srt(group_end_ms)}\n{text}\n\n"
         reflowed_transcript += text.replace('\n', ' ') + " "
 
