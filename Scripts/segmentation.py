@@ -108,10 +108,14 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         print(f"  > WARNING: [Lang: {langCode}] No word boundaries found in TTS data. Cannot create reflowed SRT subtitles. The voice for this language may not support word boundaries.")
         return None
 
-    # Group words into subtitle entries
-    MAX_CHARS_PER_LINE_SOFT = 42
-    MAX_CHARS_PER_LINE_HARD = 50
-    MAX_LINES = 2
+# Group words into subtitle entries
+    MAX_CHARS_PER_LINE_SOFT = config.reflow_max_chars_per_line_soft
+    MAX_CHARS_PER_LINE_HARD = config.reflow_max_chars_per_line_hard
+    MAX_LINES = config.reflow_max_lines_per_page
+    MAX_GAP_MS = config.reflow_max_close_gap
+    MIN_DURATION_MS = config.reflow_min_duration
+    CLOSE_GAPS = config.reflow_close_gaps
+    
     MAX_CHARS_SOFT = MAX_CHARS_PER_LINE_SOFT * MAX_LINES
     MAX_CHARS_HARD = MAX_CHARS_PER_LINE_HARD * MAX_LINES
 
@@ -234,11 +238,21 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         group_start_ms = group[0]["start_ms"]
         group_end_ms = group[-1]["start_ms"] + group[-1]["duration_ms"]
         
-        # Ensure SRT times don't overlap if audio segments overlapped
+        # Enforce minimum duration
+        if group_end_ms - group_start_ms < MIN_DURATION_MS:
+            group_end_ms = group_start_ms + MIN_DURATION_MS
+        
+        # Look ahead for overlap and gap closing
         if i < len(subtitle_groups):
             next_start = subtitle_groups[i][0]["start_ms"]
+            
+            # Ensure SRT times don't overlap if audio segments overlapped, or if MIN_DURATION pushed it too far
             if group_end_ms > next_start:
-                group_end_ms = max(group_start_ms, next_start - 1)
+                group_end_ms = max(group_start_ms, next_start)
+            elif CLOSE_GAPS:
+                gap = next_start - group_end_ms
+                if 0 < gap <= MAX_GAP_MS:
+                    group_end_ms = next_start
                 
         text = wrap_words(group, MAX_CHARS_PER_LINE_SOFT, MAX_CHARS_PER_LINE_HARD, MAX_LINES)
         finalFullSrtContents += f"{i}\n{ms_to_srt(group_start_ms)} --> {ms_to_srt(group_end_ms)}\n{text}\n\n"

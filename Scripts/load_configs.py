@@ -63,7 +63,7 @@ class CloudConfig:
 class Config:
     skip_translation: bool
     skip_synthesize: bool
-    reflow_translated_subtitles: bool
+
     prefer_custom_timing: bool
     stop_after_translation: bool
     original_language: str
@@ -85,6 +85,14 @@ class Config:
     speech_rate_goal: Union[str, int, float] # 'Auto' or int
     debug_mode: bool
     youtube_autosync_languages: list[str]
+    # Subtitle Reflow
+    reflow_translated_subtitles: bool
+    reflow_max_lines_per_page: int
+    reflow_max_chars_per_line_hard: int
+    reflow_max_chars_per_line_soft: int
+    reflow_close_gaps: bool
+    reflow_max_close_gap: int
+    reflow_min_duration: int
 
     @classmethod
     def from_dict(cls, config_dict: dict[str,str]) -> 'Config':
@@ -97,7 +105,6 @@ class Config:
         return cls(
             skip_translation=parse_bool_strict(config_dict['skip_translation']),
             skip_synthesize=parse_bool_strict(config_dict['skip_synthesize']),
-            reflow_translated_subtitles=parse_bool_strict(config_dict['reflow_translated_subtitles']),
             prefer_custom_timing=parse_bool_strict(config_dict.get('prefer_custom_timing', 'True')),
             stop_after_translation=parse_bool_strict(config_dict['stop_after_translation']),
             original_language=config_dict['original_language'],
@@ -118,7 +125,15 @@ class Config:
             prioritize_avoiding_fragmented_speech=parse_bool_strict(config_dict['prioritize_avoiding_fragmented_speech']),
             speech_rate_goal=parse_int_str_union(config_dict['speech_rate_goal'], ["Auto"]),
             debug_mode=parse_bool_strict(config_dict['debug_mode']),
-            youtube_autosync_languages=languages
+            youtube_autosync_languages=languages,
+            # Subtitle Reflow
+            reflow_translated_subtitles=parse_bool_strict(config_dict['reflow_translated_subtitles']),
+            reflow_max_lines_per_page=int(config_dict['reflow_max_lines_per_page']),
+            reflow_max_chars_per_line_hard=int(config_dict['reflow_max_chars_per_line_hard']),
+            reflow_max_chars_per_line_soft=int(config_dict['reflow_max_chars_per_line_soft']),
+            reflow_close_gaps=parse_bool_strict(config_dict['reflow_close_gaps']),
+            reflow_max_close_gap=int(config_dict['reflow_max_close_gap']),
+            reflow_min_duration=int(config_dict['reflow_min_duration'])
         )
         
 # ----------------------------------------------------------------
