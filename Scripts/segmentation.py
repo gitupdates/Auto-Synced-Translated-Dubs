@@ -120,13 +120,16 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         word = boundary["text"]
         add_len = len(word) + (1 if current_group else 0)  # +1 for space separator
 
-        if current_group and current_len + add_len > MAX_CHARS:
+        if current_group and (current_len + add_len) > MAX_CHARS:
             subtitle_groups.append(current_group)
             current_group = [boundary]
             current_len = len(word)
         else:
             current_group.append(boundary)
             current_len += add_len
+        
+        # Add new property for end_ms, will be useful for improving pretty srt page splitting
+        boundary["end_ms"] = cast(int, boundary["start_ms"]) + cast(int, boundary["duration_ms"])
 
     if current_group:
         subtitle_groups.append(current_group)
@@ -162,17 +165,17 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
     reflowed_transcript:str = "" # To compare original text to reflowed to ensure punctuation was correct
     
     for i, group in enumerate(subtitle_groups, 1):
-        start_ms = group[0]["start_ms"]
-        end_ms = group[-1]["start_ms"] + group[-1]["duration_ms"]
+        group_start_ms = group[0]["start_ms"]
+        group_end_ms = group[-1]["start_ms"] + group[-1]["duration_ms"]
         
         # Ensure SRT times don't overlap if audio segments overlapped
         if i < len(subtitle_groups):
             next_start = subtitle_groups[i][0]["start_ms"]
-            if end_ms > next_start:
-                end_ms = max(start_ms, next_start - 1)
+            if group_end_ms > next_start:
+                group_end_ms = max(group_start_ms, next_start - 1)
                 
         text = wrap_words(group, MAX_CHARS_PER_LINE)
-        finalFullSrtContents += f"{i}\n{ms_to_srt(start_ms)} --> {ms_to_srt(end_ms)}\n{text}\n\n"
+        finalFullSrtContents += f"{i}\n{ms_to_srt(group_start_ms)} --> {ms_to_srt(group_end_ms)}\n{text}\n\n"
         reflowed_transcript += text.replace('\n', ' ') + " "
 
     # Write the file
