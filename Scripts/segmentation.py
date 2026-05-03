@@ -108,15 +108,19 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         print(f"  > WARNING: [Lang: {langCode}] No word boundaries found in TTS data. Cannot create reflowed SRT subtitles. The voice for this language may not support word boundaries.")
         return None
 
-    # Group words into subtitle entries targeting 2 lines of ~42 chars each
+    # Group words into subtitle entries targeting MAX_LINES of ~MAX_CHARS_PER_LINE chars each
     MAX_CHARS_PER_LINE = 42
-    MAX_CHARS = MAX_CHARS_PER_LINE * 2
+    MAX_LINES = 2
+    MAX_CHARS = MAX_CHARS_PER_LINE * MAX_LINES
 
     subtitle_groups: list[list[dict]] = []
     current_group: list[dict] = []
     current_len = 0
 
     for boundary in all_boundaries:
+        # Add new property for end_ms, will be useful for improving pretty srt page splitting
+        boundary["end_ms"] = cast(int, boundary["start_ms"]) + cast(int, boundary["duration_ms"])
+
         word = boundary["text"]
         add_len = len(word) + (1 if current_group else 0)  # +1 for space separator
 
@@ -127,12 +131,63 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         else:
             current_group.append(boundary)
             current_len += add_len
-        
-        # Add new property for end_ms, will be useful for improving pretty srt page splitting
-        boundary["end_ms"] = cast(int, boundary["start_ms"]) + cast(int, boundary["duration_ms"])
 
     if current_group:
         subtitle_groups.append(current_group)
+
+    # --- Prettify page splits by shifting boundary words between blocks ---
+    CLAUSE_ENDERS = (',', ';', ':', '»', '"', '」', '』', '›', '.', '?', '!')
+    CLAUSE_STARTERS = ('«', '"', '「', '『', '‹')
+    SHORT_WORD_THRESHOLD = 999
+
+    # Pass 1: Move clause-ending words from block start to previous block end
+    i = 1
+    while i < len(subtitle_groups):
+        curr_group = subtitle_groups[i]
+        prev_group = subtitle_groups[i - 1]
+        
+        if not curr_group:
+            subtitle_groups.pop(i)
+            continue
+            
+        first_word = curr_group[0]["text"]
+        
+        if any(first_word.endswith(ender) for ender in CLAUSE_ENDERS):
+            prev_text_len = sum(len(w["text"]) for w in prev_group) + len(prev_group) - 1
+            if prev_text_len + 1 + len(first_word) <= MAX_CHARS + 10: # +10 grace for formatting
+                prev_group.append(curr_group.pop(0))
+                if not curr_group:
+                    subtitle_groups.pop(i)
+                    continue
+        i += 1
+
+    # Pass 2: Move clause-starting words from block end to next block start
+    i = 0
+    while i < len(subtitle_groups) - 1:
+        curr_group = subtitle_groups[i]
+        next_group = subtitle_groups[i + 1]
+        
+        if not curr_group:
+            subtitle_groups.pop(i)
+            continue
+            
+        last_word = curr_group[-1]["text"]
+        
+        is_clause_starter = any(last_word.startswith(starter) for starter in CLAUSE_STARTERS)
+        if len(curr_group) >= 2:
+            second_last_word = curr_group[-2]["text"]
+            if any(second_last_word.endswith(ender) for ender in CLAUSE_ENDERS):
+                is_clause_starter = True
+                
+        is_clause_ender = any(last_word.endswith(ender) for ender in CLAUSE_ENDERS)
+        
+        if is_clause_starter and not is_clause_ender and len(last_word) <= SHORT_WORD_THRESHOLD:
+            next_group.insert(0, curr_group.pop(-1))
+            if not curr_group:
+                subtitle_groups.pop(i)
+                continue
+        i += 1
+    # ----------------------------------------------------------------------
 
     # Helper: convert milliseconds to SRT timestamp string
     def ms_to_srt(ms: int) -> str:
@@ -147,10 +202,14 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         lines: list[str] = []
         line_words: list[str] = []
         line_len = 0
-        for w in words:
+        for idx, w in enumerate(words):
             word = w["text"]
             add = len(word) + (1 if line_words else 0)
-            if line_words and line_len + add > max_line_chars:
+            
+            is_last_word = (idx == len(words) - 1)
+            
+            # Allow slight overflow for the last word to avoid dangling single-word lines
+            if line_words and line_len + add > max_line_chars and not (is_last_word and line_len + add <= max_line_chars + 10):
                 lines.append(' '.join(line_words))
                 line_words = [word]
                 line_len = len(word)
@@ -160,6 +219,8 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         if line_words:
             lines.append(' '.join(line_words))
         return '\n'.join(lines)
+    
+    # ------------------------------------------------------------------
     
     finalFullSrtContents:str = ""
     reflowed_transcript:str = "" # To compare original text to reflowed to ensure punctuation was correct
