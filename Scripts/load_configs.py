@@ -63,6 +63,7 @@ class CloudConfig:
 class Config:
     skip_translation: bool
     skip_synthesize: bool
+    reflow_translated_subtitles: bool
     prefer_custom_timing: bool
     stop_after_translation: bool
     original_language: str
@@ -96,6 +97,7 @@ class Config:
         return cls(
             skip_translation=parse_bool_strict(config_dict['skip_translation']),
             skip_synthesize=parse_bool_strict(config_dict['skip_synthesize']),
+            reflow_translated_subtitles=parse_bool_strict(config_dict['reflow_translated_subtitles']),
             prefer_custom_timing=parse_bool_strict(config_dict.get('prefer_custom_timing', 'True')),
             stop_after_translation=parse_bool_strict(config_dict['stop_after_translation']),
             original_language=config_dict['original_language'],

@@ -100,6 +100,8 @@ class SubsDictKeys(str, enum.Enum):
     char_rate = "char_rate"
     char_rate_diff = "char_rate_diff"
     TTS_FilePath = "TTS_FilePath"
+    TTS_Word_Boundaries = "TTS_Word_Boundaries"
+    TTS_Sentence_Boundaries = "TTS_Sentence_Boundaries"
     TTS_FilePath_Trimmed = "TTS_FilePath_Trimmed"
     speed_factor = "speed_factor"
     force_split_at_start = "force_split_at_start"

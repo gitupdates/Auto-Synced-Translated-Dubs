@@ -1,14 +1,44 @@
 import typing
 
-
 # Subtitle Dictionary Types
 # These represent subtitle entries at various stages of processing
 # Note: Using dict[str, Any] instead of TypedDict because keys are SubsDictKeys enum values,
 # not literal strings, which TypedDict doesn't support well
 
+class CaptionSnippet(typing.TypedDict):
+    videoId: str
+    lastUpdated: str
+    trackKind: str
+    language: str
+    name: str
+    audioTrackType: str
+    isCC: bool
+    isLarge: bool
+    isEasyReader: bool
+    isDraft: bool
+    isAutoSynced: bool
+    status: str
+
+class Caption(typing.TypedDict):
+    kind: str
+    etag: str
+    id: str
+    snippet: CaptionSnippet
+
+class CaptionListResponse(typing.TypedDict):
+    kind: str
+    etag: str
+    items: typing.List[Caption]
+
+class Boundary(typing.TypedDict):
+    Text: str
+    AudioOffset: int
+    Duration: int
+
+
 # Type alias for a single subtitle entry
 # The dictionary values can be str, int, or float depending on the field
-SubtitleEntry = dict[str, str | int | float]
+SubtitleEntry = dict[str, str | int | float | list[Boundary]]
 
 # Dictionary types for different key types
 # Keys can be either str (line numbers as strings) or int (after conversion)
@@ -44,29 +74,3 @@ TTS fields (added after synthesis):
 Audio processing fields (added during audio building):
     - TTS_FilePath_Trimmed: str - Path to trimmed audio file
 """
-
-
-class CaptionSnippet(typing.TypedDict):
-    videoId: str
-    lastUpdated: str
-    trackKind: str
-    language: str
-    name: str
-    audioTrackType: str
-    isCC: bool
-    isLarge: bool
-    isEasyReader: bool
-    isDraft: bool
-    isAutoSynced: bool
-    status: str
-
-class Caption(typing.TypedDict):
-    kind: str
-    etag: str
-    id: str
-    snippet: CaptionSnippet
-
-class CaptionListResponse(typing.TypedDict):
-    kind: str
-    etag: str
-    items: typing.List[Caption]

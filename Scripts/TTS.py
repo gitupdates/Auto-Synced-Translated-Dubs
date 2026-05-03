@@ -380,8 +380,8 @@ def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKey
                 "inputs": ssmlJson,
                 "properties": {
                     "outputFormat": "audio-48khz-192kbitrate-mono-mp3",
-                    "wordBoundaryEnabled": False,
-                    "sentenceBoundaryEnabled": False,
+                    "wordBoundaryEnabled": True,
+                    "sentenceBoundaryEnabled": True,
                     "concatenateResult": False,
                     "decompressOutputFiles": False
                 },
@@ -482,6 +482,7 @@ def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKey
                         f.write(urlResponse.read())
                     # Reset urlResponse so it can be read again
                     urlResponse = urlopen(resultDownloadLink)
+                    
                 # Process zip file    
                 virtualResultZip = io.BytesIO(urlResponse.read())
                 zipdata = zipfile.ZipFile(virtualResultZip)
@@ -507,8 +508,30 @@ def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKey
                         zipdata.extract(file, 'workingFolder')
                         # Remove entry from remainingDownloadedEntriesList
                         remainingDownloadedEntriesList.pop(0)
+                    else: # Json files, probably word and sentence boundaries
+                        # Just extract with original name for now, then process later
+                        boundaries:list[Boundary] = json.load(zipdata.open(file)) # Open the file and store the boundaries dictionaries
+                        zipdata.extract(file, 'workingFolder')
+                        if "word" in file.filename:
+                            subsDict[currentFileNum][SubsDictKeys.TTS_Word_Boundaries] = boundaries
+                        elif "sentence" in file.filename:
+                            subsDict[currentFileNum][SubsDictKeys.TTS_Sentence_Boundaries] = boundaries
+        
+        # Dump the current full subsDict to the working folder as json
+        if config.debug_mode:
+            if secondPass == False:
+                debugFileName:str = f'subsDict_{langDict[LangDictKeys.languageCode]}_afterAzureBatch_pass1.json'
+            else:
+                debugFileName:str = f'subsDict_{langDict[LangDictKeys.languageCode]}_afterAzureBatch_pass2.json'
+                
+            try:
+                with open(os.path.join('workingFolder', debugFileName), 'w', encoding='utf-8') as f:
+                    json.dump(subsDict, f, ensure_ascii=False, indent=4)
+            except Exception as ex:
+                print(f"Error writing subsDict to json file for debugging: {str(ex)}")
+                input("Press Enter to continue...")
+                
     return subsDict
-
 
 def synthesize_dictionary_batch(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], skipSynthesize:bool=False, secondPass:bool=False) -> SubtitleDict:
     if not skipSynthesize:

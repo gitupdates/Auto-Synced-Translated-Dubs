@@ -45,10 +45,10 @@ DEEPL_API = None
 
 # Authorize the request and store authorization credentials.
 @overload
-def get_authenticated_service(youtubeAuth: Literal[True], specifySecretsFile:Optional[str]=None) -> object: ...
+def get_authenticated_service(youtubeAuth: Literal[True], specifySecretsFile:Optional[str]=None, additionalScopes:Optional[list[str]]=None) -> object: ...
 @overload
-def get_authenticated_service(youtubeAuth: Literal[False], specifySecretsFile:Optional[str]=None) -> Tuple[object, object]: ...
-def get_authenticated_service(youtubeAuth: bool = False, specifySecretsFile:Optional[str]=None) -> Union[object, Tuple[object, object]]:
+def get_authenticated_service(youtubeAuth: Literal[False], specifySecretsFile:Optional[str]=None, additionalScopes:Optional[list[str]]=None) -> Tuple[object, object]: ...
+def get_authenticated_service(youtubeAuth: bool = False, specifySecretsFile:Optional[str]=None, additionalScopes:Optional[list[str]]=None) -> Union[object, Tuple[object, object]]:
   global GOOGLE_TTS_API
   global GOOGLE_TRANSLATE_API
   CLIENT_SECRETS_FILE = 'client_secrets.json'
@@ -78,10 +78,15 @@ def get_authenticated_service(youtubeAuth: bool = False, specifySecretsFile:Opti
     API_SCOPES = YT_READ_WRITE_SSL_SCOPE
   else:
     API_SCOPES = GOOGLE_API_SCOPES
+    
+  if additionalScopes is not None:
+    API_SCOPES = API_SCOPES + additionalScopes
 
   if specifySecretsFile != None:
     # Make a token file name based on the specified secrets file
     token_file = f"{os.path.splitext(specifySecretsFile)[0]}_token.pickle"
+    global youtube_token_filename
+    youtube_token_filename = token_file
   elif youtubeAuth == True:
     token_file = youtube_token_filename
   else:
@@ -151,10 +156,10 @@ def get_authenticated_service(youtubeAuth: bool = False, specifySecretsFile:Opti
   else:
     raise Exception("Failed to build Google TTS or Translate API service")
 
-def youtube_authentication(specifySecretsFile:Optional[str] = None):
+def youtube_authentication(specifySecretsFile:Optional[str] = None, additionalScopes:Optional[list[str]]=None):
   global YOUTUBE_API
   try:
-    YOUTUBE_API = get_authenticated_service(youtubeAuth = True, specifySecretsFile=specifySecretsFile) # Create authentication object
+    YOUTUBE_API = get_authenticated_service(youtubeAuth = True, specifySecretsFile=specifySecretsFile, additionalScopes=additionalScopes) # Create authentication object
   except JSONDecodeError as jx:
     YOUTUBE_API = None
     print(f" [!!!] Error: " + str(jx))
@@ -175,7 +180,7 @@ def youtube_authentication(specifySecretsFile:Optional[str] = None):
       
   return YOUTUBE_API
 
-def first_authentication(specifySecretsFile:Optional[str] = None):
+def first_authentication(specifySecretsFile:Optional[str] = None, additionalScopes:Optional[list[str]]=None):
   global GOOGLE_TTS_API, GOOGLE_TRANSLATE_API
   try:
     GOOGLE_TTS_API, GOOGLE_TRANSLATE_API = get_authenticated_service(False, specifySecretsFile=specifySecretsFile) # Create authentication object
@@ -223,13 +228,13 @@ def authenticate_specific_service(service: Literal[AuthCloudServices.GOOGLE], sp
 @overload
 def authenticate_specific_service(service: Literal[AuthCloudServices.DEEPL]) -> deepl.Translator: ...
 @overload
-def authenticate_specific_service(service: Literal[AuthCloudServices.YOUTUBE], specifySecretsFile:Optional[str] = None) -> object: ...
-def authenticate_specific_service(service: AuthCloudServices, specifySecretsFile:Optional[str] = None) -> Union[object, Tuple[object, object], deepl.Translator]: 
+def authenticate_specific_service(service: Literal[AuthCloudServices.YOUTUBE], specifySecretsFile:Optional[str] = None, additionalScopes:Optional[list[str]]=None) -> object: ...
+def authenticate_specific_service(service: AuthCloudServices, specifySecretsFile:Optional[str] = None, additionalScopes:Optional[list[str]]=None) -> Union[object, Tuple[object, object], deepl.Translator]: 
   if service == AuthCloudServices.GOOGLE and GOOGLE_TRANSLATE_API == None and GOOGLE_TRANSLATE_API == None:
-    return first_authentication(specifySecretsFile=specifySecretsFile)
+    return first_authentication(specifySecretsFile=specifySecretsFile, additionalScopes=additionalScopes)
     
   elif service == AuthCloudServices.DEEPL and DEEPL_API == None:
     return deepl_auth()
     
   elif service == AuthCloudServices.YOUTUBE and YOUTUBE_API == None:
-    return youtube_authentication(specifySecretsFile=specifySecretsFile)
+    return youtube_authentication(specifySecretsFile=specifySecretsFile, additionalScopes=additionalScopes)

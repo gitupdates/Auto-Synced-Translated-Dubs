@@ -23,8 +23,9 @@ batchConfig = configparser.ConfigParser()
 batchConfig.read('batch.ini') # Don't process this one, need sections in tact for languages
       
 # ----- Validation Checks ------ (Add these to their own file eventually)
-if config.skip_synthesize == True and cloudConfig.batch_tts_synthesize == True:
+if config.skip_synthesize == True and cloudConfig.batch_tts_synthesize == True and config.debug_mode == False:
     raise ValueError(f'\nERROR: Cannot skip voice synthesis when batch mode is enabled. Please disable batch_tts_synthesize or set skip_synthesize to False.')
+
 if cloudConfig.tts_service == "elevenlabs":
     if "yourkey" in cloudConfig.elevenlabs_api_key.lower():
         raise ValueError(f"\n\nERROR: You chose ElevenLabs as your TTS service, but didnt set your ElevenLabs API Key in cloud_service_settings.ini")

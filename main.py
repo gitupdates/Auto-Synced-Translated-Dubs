@@ -16,6 +16,7 @@ import Scripts.audio_builder as audio_builder
 import Scripts.utils as utils
 #import Scripts.auth as auth
 import Scripts.translate as translate
+import Scripts.segmentation as segmentation
 
 # Import built in modules
 import re
@@ -170,10 +171,18 @@ def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> Subt
 # ----------------------------------------
 
 # Open an srt file and read the lines into a list
-with open(srtFile, 'r', encoding='utf-8-sig') as f:
-    originalSubLines = f.readlines()
-
-originalLanguageSubsDict: SubtitleDictStr = parse_srt_file(originalSubLines)
+try:
+    with open(srtFile, 'r', encoding='utf-8-sig') as f:
+        originalSubLines = f.readlines()
+        originalLanguageSubsDict: SubtitleDictStr = parse_srt_file(originalSubLines)
+except Exception as e:
+    if config.skip_translation is True:
+        # Just print a warning but we don't actually need the original SRT if not translating so continue anyway
+        print(f"Warning: Failed to read or parse the SRT file at '{srtFile}'. But since skip_translation is enabled, we'll continue anyway.")
+        originalLanguageSubsDict = {}
+    else:
+        raise ValueError(f"Failed to read or parse the SRT file at '{srtFile}'. Make sure the path is correct and the file is a valid SRT. Error details: {e}")
+    
 
 #======================================== Get Total Duration ================================================
 # Final audio file Should equal the length of the video in milliseconds
@@ -418,7 +427,12 @@ def process_language(langData:dict[str, str], processedCount:int, totalLanguages
         individualLanguageSubsDict = TTS.synthesize_dictionary(individualLanguageSubsDict, langDict, skipSynthesize=config.skip_synthesize)
 
     # Build audio
-    audio_builder.build_audio(individualLanguageSubsDict, langDict, totalAudioLength, config.two_pass_voice_synth)    
+    audio_builder.build_audio(individualLanguageSubsDict, langDict, totalAudioLength, config.two_pass_voice_synth)
+    
+    # Reflow the translated subtitles if the option is enabled, to match the timing of the synthesized audio better, and output a new SRT file with the reflowed subtitles and adjusted timestamps
+    if config.reflow_translated_subtitles == True:
+        print("\nReflowing translated subtitles to match synthesized audio timing...")
+        segmentation.reflow_subtitles(individualLanguageSubsDict, langDict[LangDictKeys.languageCode], langName=langDict[LangDictKeys.targetLanguage])
 
 
 #======================================== Main Program ================================================
