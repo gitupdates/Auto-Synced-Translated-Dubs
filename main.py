@@ -22,6 +22,7 @@ import Scripts.segmentation as segmentation
 import re
 import copy
 import asyncio
+import json
 from typing import Any
 # Import winsound if on Windows
 if os.name == 'nt':
@@ -427,7 +428,16 @@ def process_language(langData:dict[str, str], processedCount:int, totalLanguages
         individualLanguageSubsDict = TTS.synthesize_dictionary(individualLanguageSubsDict, langDict, skipSynthesize=config.skip_synthesize)
 
     # Build audio
-    audio_builder.build_audio(individualLanguageSubsDict, langDict, totalAudioLength, config.two_pass_voice_synth)
+    individualLanguageSubsDict = audio_builder.build_audio(individualLanguageSubsDict, langDict, totalAudioLength, config.two_pass_voice_synth)
+    
+    # Dump final subsDict to file if in debug mode
+    if config.debug_mode:
+        try:
+            with open(os.path.join('workingFolder', f'subsDictFinal_{langDict[LangDictKeys.languageCode]}.json'), 'w', encoding='utf-8') as f:
+                json.dump(individualLanguageSubsDict, f, ensure_ascii=False, indent=4)
+        except Exception as ex:
+            print(f"Error writing subsDict to json file for debugging: {str(ex)}")
+            input("Press Enter to continue...")
     
     # Reflow the translated subtitles if the option is enabled, to match the timing of the synthesized audio better, and output a new SRT file with the reflowed subtitles and adjusted timestamps
     if config.reflow_translated_subtitles == True:
