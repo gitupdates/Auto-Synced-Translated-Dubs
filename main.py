@@ -138,21 +138,21 @@ def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> Subt
             # Converts the time to milliseconds
             processedTime1 = int(time1[0]) * 3600000 + int(time1[1]) * 60000 + int(time1[2].split(',')[0]) * 1000 + int(time1[2].split(',')[1]) #/ 1000 #Uncomment to turn into seconds
             processedTime2 = int(time2[0]) * 3600000 + int(time2[1]) * 60000 + int(time2[2].split(',')[0]) * 1000 + int(time2[2].split(',')[1]) #/ 1000 #Uncomment to turn into seconds
-            timeDifferenceMs = str(processedTime2 - processedTime1)
+            timeDifferenceMs = processedTime2 - processedTime1
 
             # Adjust times with buffer
             if addBufferMilliseconds > 0 and not preTranslated:
-                subsDict[line].start_ms_buffered = str(processedTime1 + addBufferMilliseconds)
-                subsDict[line].end_ms_buffered = str(processedTime2 - addBufferMilliseconds)
-                subsDict[line].duration_ms_buffered = str((processedTime2 - addBufferMilliseconds) - (processedTime1 + addBufferMilliseconds))
+                subsDict[line].start_ms_buffered = processedTime1 + addBufferMilliseconds
+                subsDict[line].end_ms_buffered = processedTime2 - addBufferMilliseconds
+                subsDict[line].duration_ms_buffered = (processedTime2 - addBufferMilliseconds) - (processedTime1 + addBufferMilliseconds)
             else:
-                subsDict[line].start_ms_buffered = str(processedTime1)
-                subsDict[line].end_ms_buffered = str(processedTime2)
-                subsDict[line].duration_ms_buffered = str(processedTime2 - processedTime1)
+                subsDict[line].start_ms_buffered = processedTime1
+                subsDict[line].end_ms_buffered = processedTime2
+                subsDict[line].duration_ms_buffered = processedTime2 - processedTime1
             
             # Set the keys in the dictionary to the values
-            subsDict[line].start_ms = str(processedTime1)
-            subsDict[line].end_ms = str(processedTime2)
+            subsDict[line].start_ms = processedTime1
+            subsDict[line].end_ms = processedTime2
             subsDict[line].duration_ms = timeDifferenceMs
             subsDict[line].text = lineWithSubtitleText
             if lineNum > 0:
@@ -272,7 +272,7 @@ def make_dictionary_using_custom_timing(languageCode:str) -> SubtitleDict:
                     processedTime1 = utils.time_to_ms(startTimecode)
                     processedTime2 = utils.time_to_ms(endTimecode)
                     # processedTime2 = int(time2[0]) * 3600000 + int(time2[1]) * 60000 + int(time2[2].split(',')[0]) * 1000 + int(time2[2].split(',')[1])
-                    timeDifferenceMs = str(processedTime2 - processedTime1)
+                    timeDifferenceMs = processedTime2 - processedTime1
                     
                     addBufferMilliseconds = int(config.add_line_buffer_milliseconds)
                     
@@ -281,25 +281,25 @@ def make_dictionary_using_custom_timing(languageCode:str) -> SubtitleDict:
                         
                         # Check if a buffer of the desired amount already exists
                         if previousEndMs != -1 and ( (processedTime1 - previousEndMs) <= (addBufferMilliseconds * 2) ):
-                            start_ms_buffered = str(processedTime1 + addBufferMilliseconds)
+                            start_ms_buffered = processedTime1 + addBufferMilliseconds
                         else:
-                            start_ms_buffered = str(processedTime1)
+                            start_ms_buffered = processedTime1
                             
                         if previousStartMs != -1 and ( (previousStartMs - processedTime2) <= (addBufferMilliseconds * 2) ):
-                            end_ms_buffered = str(processedTime2 - addBufferMilliseconds)
+                            end_ms_buffered = processedTime2 - addBufferMilliseconds
                         else:
-                            end_ms_buffered = str(processedTime2)
+                            end_ms_buffered = processedTime2
                             
                     else:
-                        start_ms_buffered = str(processedTime1)
-                        end_ms_buffered = str(processedTime2)
+                        start_ms_buffered = processedTime1
+                        end_ms_buffered = processedTime2
                         
-                    duration_ms_buffered = str(int(end_ms_buffered) - int(start_ms_buffered))
+                    duration_ms_buffered = end_ms_buffered - start_ms_buffered
 
                     # Create entry in dictionary
                     customSubsDict[lineNum + 1] = SubtitleEntry(
-                        start_ms=str(processedTime1),
-                        end_ms=str(processedTime2),
+                        start_ms=processedTime1,
+                        end_ms=processedTime2,
                         duration_ms=timeDifferenceMs,
                         text=subtitleText,
                         translated_text=subtitleText,

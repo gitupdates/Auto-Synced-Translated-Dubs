@@ -39,15 +39,15 @@ class Boundary(typing.TypedDict):
 class SubtitleEntry:
     # Core fields
     srt_timestamps_line: str = ''
-    start_ms: str = ''
-    end_ms: str = ''
-    duration_ms: str = ''
+    start_ms: int = -1
+    end_ms: int = -1
+    duration_ms: int = -1
     text: str = ''
     break_until_next: int = 0
     # Buffered timing
-    start_ms_buffered: str = ''
-    end_ms_buffered: str = ''
-    duration_ms_buffered: str = ''
+    start_ms_buffered: int = -1
+    end_ms_buffered: int = -1
+    duration_ms_buffered: int = -1
     # Translation fields
     translated_text: str = ''
     originalIndex: int = 0

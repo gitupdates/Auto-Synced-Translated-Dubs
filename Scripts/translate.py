@@ -838,8 +838,8 @@ def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, 
                 entryListLocal[i].translated_text = str(entryListLocal[i].translated_text) + ' ' + str(entryListLocal[i+1].translated_text)
                 entryListLocal[i].end_ms = entryListLocal[i+1].end_ms
                 entryListLocal[i].end_ms_buffered = entryListLocal[i+1].end_ms_buffered
-                entryListLocal[i].duration_ms = str(int(entryListLocal[i+1].end_ms) - int(entryListLocal[i].start_ms))
-                entryListLocal[i].duration_ms_buffered = str(int(entryListLocal[i+1].end_ms_buffered) - int(entryListLocal[i].start_ms_buffered))
+                entryListLocal[i].duration_ms = entryListLocal[i+1].end_ms - entryListLocal[i].start_ms
+                entryListLocal[i].duration_ms_buffered = entryListLocal[i+1].end_ms_buffered - entryListLocal[i].start_ms_buffered
                 entryListLocal[i].srt_timestamps_line = str(entryListLocal[i].srt_timestamps_line).split(' --> ')[0] + ' --> ' + str(entryListLocal[i+1].srt_timestamps_line).split(' --> ')[1]
                 # For force split at start value, use start of current one, for end use end of next one
                 entryListLocal[i].force_split_at_end = entryListLocal[i+1].force_split_at_end
@@ -852,8 +852,8 @@ def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, 
                 entryListLocal[i-1].translated_text = str(entryListLocal[i-1].translated_text) + ' ' + str(entryListLocal[i].translated_text)
                 entryListLocal[i-1].end_ms = entryListLocal[i].end_ms
                 entryListLocal[i-1].end_ms_buffered = entryListLocal[i].end_ms_buffered
-                entryListLocal[i-1].duration_ms = str(int(entryListLocal[i].end_ms) - int(entryListLocal[i-1].start_ms))
-                entryListLocal[i-1].duration_ms_buffered = str(int(entryListLocal[i].end_ms_buffered) - int(entryListLocal[i-1].start_ms_buffered))
+                entryListLocal[i-1].duration_ms = entryListLocal[i].end_ms - entryListLocal[i-1].start_ms
+                entryListLocal[i-1].duration_ms_buffered = entryListLocal[i].end_ms_buffered - entryListLocal[i-1].start_ms_buffered
                 entryListLocal[i-1].srt_timestamps_line = str(entryListLocal[i-1].srt_timestamps_line).split(' --> ')[0] + ' --> ' + str(entryListLocal[i].srt_timestamps_line).split(' --> ')[1]
                 # For force split at start value, use start of previous one, for end use end of current one
                 entryListLocal[i-1].force_split_at_end = entryListLocal[i].force_split_at_end

@@ -85,33 +85,6 @@ class LangDictKeys(str, enum.Enum):
     def __str__(self):
         return self.value
     
-class SubsDictKeys(str, enum.Enum):
-    start_ms = "start_ms"
-    end_ms = "end_ms"
-    duration_ms = "duration_ms"
-    text = "text"
-    break_until_next = "break_until_next"
-    srt_timestamps_line = "srt_timestamps_line"
-    start_ms_buffered = "start_ms_buffered"
-    end_ms_buffered = "end_ms_buffered"
-    duration_ms_buffered = "duration_ms_buffered"
-    translated_text = "translated_text"
-    originalIndex = "originalIndex"
-    char_rate = "char_rate"
-    char_rate_diff = "char_rate_diff"
-    TTS_FilePath = "TTS_FilePath"
-    TTS_Word_Boundaries = "TTS_Word_Boundaries"
-    TTS_Sentence_Boundaries = "TTS_Sentence_Boundaries"
-    TTS_FilePath_Trimmed = "TTS_FilePath_Trimmed"
-    speed_factor = "speed_factor"
-    force_split_at_start = "force_split_at_start"
-    force_split_at_end = "force_split_at_end"
-    start_trimmed_ms= "start_trimmed_ms"
-    end_trimmed_ms = "end_trimmed_ms"
-
-    def __str__(self):
-        return self.value
-    
 class VariousDefaults():
     defaultSpeechRateGoal:float = 20
 
