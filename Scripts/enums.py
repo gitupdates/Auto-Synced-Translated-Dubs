@@ -106,6 +106,8 @@ class SubsDictKeys(str, enum.Enum):
     speed_factor = "speed_factor"
     force_split_at_start = "force_split_at_start"
     force_split_at_end = "force_split_at_end"
+    start_trimmed_ms= "start_trimmed_ms"
+    end_trimmed_ms = "end_trimmed_ms"
 
     def __str__(self):
         return self.value

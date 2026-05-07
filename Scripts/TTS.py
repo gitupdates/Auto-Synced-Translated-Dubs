@@ -248,7 +248,10 @@ async def synthesize_text_elevenlabs_async_http(text:str, voiceID:str, modelID:s
 def synthesize_text_azure(text:str, duration:str|int|float, voiceName:str, languageCode:str, style:str) -> speechsdk.AudioDataStream:
 
     # Create tag for desired duration of clip
-    durationTag = f'<mstts:audioduration value="{str(duration)}ms"/>'
+    if config.azure_no_force_duration == True:
+        durationTag = ''
+    else:
+        durationTag = f'<mstts:audioduration value="{str(duration)}ms"/>'
 
     # Create string for sentence pauses, if not default
     if not config.azure_sentence_pause == 'default':
@@ -330,7 +333,10 @@ def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKey
             style = langDict[LangDictKeys.voiceStyle]
 
             # Create tag for desired duration of clip
-            durationTag = f'<mstts:audioduration value="{str(duration)}ms"/>'
+            if config.azure_no_force_duration == True:
+                durationTag = ''
+            else:
+                durationTag = f'<mstts:audioduration value="{str(duration)}ms"/>'
 
             # Create string for sentence pauses, if not default
             if not config.azure_sentence_pause == 'default':

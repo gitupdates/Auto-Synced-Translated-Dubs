@@ -77,6 +77,7 @@ class Config:
     force_always_stretch: bool
     azure_sentence_pause: Union[str, int] # 'default' or int
     azure_comma_pause: Union[str, int] # 'default' or int
+    azure_no_force_duration: bool
     add_line_buffer_milliseconds: int
     combine_subtitles_max_chars: int
     increase_max_chars_for_extreme_speeds: bool
@@ -118,6 +119,7 @@ class Config:
             force_always_stretch=parse_bool_strict(config_dict['force_always_stretch']),
             azure_sentence_pause=parse_int_str_union(config_dict['azure_sentence_pause'], ["default"]),
             azure_comma_pause=parse_int_str_union(config_dict['azure_comma_pause'], ["default"]),
+            azure_no_force_duration=parse_bool_strict(config_dict['azure_no_force_duration']),
             add_line_buffer_milliseconds=int(config_dict['add_line_buffer_milliseconds']),
             combine_subtitles_max_chars=int(config_dict['combine_subtitles_max_chars']),
             increase_max_chars_for_extreme_speeds=parse_bool_strict(config_dict['increase_max_chars_for_extreme_speeds']),

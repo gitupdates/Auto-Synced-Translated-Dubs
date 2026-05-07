@@ -34,7 +34,12 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         word_boundaries = cast(list[Boundary], segment.get(SubsDictKeys.TTS_Word_Boundaries, []))
 
         # If they exist, add the segment's start time to the offsets and add them to the all_boundaries list
-        segment_start_ms = int(cast(str | int | float, segment[SubsDictKeys.start_ms]))
+        segment_start_ms = int(cast(str | int | float, segment[SubsDictKeys.start_ms_buffered]))
+        
+        # Speed factor affects the duration and audio offset
+        speed_factor:float = cast(float, segment.get(SubsDictKeys.speed_factor, 1.0))
+        # Trimmed amount from the original audio affects the audio offset
+        trimmed_amount_ms:int = cast(int, segment.get(SubsDictKeys.start_trimmed_ms, 0))
         
         full_text = str(segment.get("translated_text") or segment.get("text", ""))
         current_pos = 0
@@ -42,8 +47,10 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
 
         for boundary in word_boundaries:
             b_text = boundary["Text"]
-            b_start = segment_start_ms + int(boundary["AudioOffset"])
-            b_dur = int(boundary["Duration"])
+            # Clamp to minimum of zero. We actually need to use the 'max' method because python is stupid.
+            adjusted_boundary_start_ms = max(0, segment_start_ms + int(float(boundary["AudioOffset"] - trimmed_amount_ms) * speed_factor))
+            b_start = adjusted_boundary_start_ms
+            b_dur = int(float(boundary["Duration"]) * speed_factor)
 
             idx = full_text.find(b_text, current_pos)
             
@@ -108,7 +115,7 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         print(f"  > WARNING: [Lang: {langCode}] No word boundaries found in TTS data. Cannot create reflowed SRT subtitles. The voice for this language may not support word boundaries.")
         return None
 
-# Group words into subtitle entries
+    # Group words into subtitle entries
     MAX_CHARS_PER_LINE_SOFT = config.reflow_max_chars_per_line_soft
     MAX_CHARS_PER_LINE_HARD = config.reflow_max_chars_per_line_hard
     MAX_LINES = config.reflow_max_lines_per_page
@@ -252,7 +259,15 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
             elif CLOSE_GAPS:
                 gap = next_start - group_end_ms
                 if 0 < gap <= MAX_GAP_MS:
-                    group_end_ms = next_start
+                    half_gap = gap // 2
+                    
+                    # 1. Push the CURRENT subtitle's end time forward
+                    group_end_ms += half_gap
+                    
+                    # 2. Pull the NEXT subtitle's start time backward directly in the dictionary
+                    # We subtract (gap - half_gap) to ensure odd-numbered gaps close perfectly
+                    subtitle_groups[i][0]["start_ms"] -= (gap - half_gap)
+                    
                 
         text = wrap_words(group, MAX_CHARS_PER_LINE_SOFT, MAX_CHARS_PER_LINE_HARD, MAX_LINES)
         finalFullSrtContents += f"{i}\n{ms_to_srt(group_start_ms)} --> {ms_to_srt(group_end_ms)}\n{text}\n\n"

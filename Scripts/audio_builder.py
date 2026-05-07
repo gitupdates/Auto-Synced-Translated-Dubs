@@ -11,7 +11,7 @@ import Scripts.TTS as TTS
 
 from pydub import AudioSegment
 from pydub.silence import detect_leading_silence
-from typing import Any
+from typing import Any, cast
 import langcodes
 import subprocess
 
@@ -25,12 +25,15 @@ workingFolder = "workingFolder"
 if sysPlatform() == "Darwin":
     os.environ['PATH'] += os.pathsep + os.getcwd()
 
-def trim_clip(inputSound: AudioSegment) -> AudioSegment:
-    trim_leading_silence = lambda x: x[detect_leading_silence(x):]
-    trim_trailing_silence = lambda x: trim_leading_silence(x.reverse()).reverse()
-    strip_silence = lambda x: trim_trailing_silence(trim_leading_silence(x))
-    
-    return strip_silence(inputSound)
+def trim_clip(inputSound: AudioSegment) -> tuple[AudioSegment, int, int]:
+    start_trim_ms = detect_leading_silence(inputSound)
+    trimmed_start: AudioSegment = cast(AudioSegment, inputSound[start_trim_ms:])
+
+    reversed_audio: AudioSegment = trimmed_start.reverse()
+    end_trim_ms = detect_leading_silence(reversed_audio)
+    trimmed_both: AudioSegment = cast(AudioSegment, reversed_audio[end_trim_ms:]).reverse()
+
+    return trimmed_both, start_trim_ms, end_trim_ms
 
 # Function to insert audio into canvas at specific point
 def insert_audio(canvas, audioToOverlay, startTimeMs):
@@ -138,7 +141,10 @@ def build_audio(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], totalAu
             else:
                 print("\nERROR: An expected file was not found. This is likely because the TTS service failed to synthesize the audio. Refer to any error messages above.")
             sys.exit()
-        trimmedClip = trim_clip(rawClip)
+        trimmedClip, _start_trim, _end_trim = trim_clip(rawClip)
+        subsDict[key][SubsDictKeys.start_trimmed_ms] = _start_trim
+        subsDict[key][SubsDictKeys.end_trimmed_ms] = _end_trim
+        
         if config.debug_mode:
             trimmedClip.export(filePathTrimmed, format="wav")
 
@@ -179,7 +185,10 @@ def build_audio(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], totalAu
         for key, value in subsDict.items():
             # Trim the clip and re-write file
             rawClip = AudioSegment.from_file(value[SubsDictKeys.TTS_FilePath], format="mp3")
-            trimmedClip = trim_clip(rawClip)
+            trimmedClip, _start_trim, _end_trim = trim_clip(rawClip)
+            # Update the trimmed amounts
+            subsDict[key][SubsDictKeys.start_trimmed_ms] = _start_trim
+            subsDict[key][SubsDictKeys.end_trimmed_ms] = _end_trim
             if config.debug_mode:
                 # Remove '.wav' from the end of the file path
                 secondPassTrimmedFile = str(value[SubsDictKeys.TTS_FilePath_Trimmed])[:-4] + "_p2_trimmed.wav"
