@@ -31,10 +31,10 @@ if cloudConfig.tts_service == "elevenlabs":
         raise ValueError(f"\n\nERROR: You chose ElevenLabs as your TTS service, but didnt set your ElevenLabs API Key in cloud_service_settings.ini")
 
 if config.reflow_translated_subtitles == True:
-    if cloudConfig.tts_service != TTSService.AZURE:
-        raise ValueError(f"\n\nERROR: Reflowing translated subtitles is currently only supported with Azure TTS (using batch mode). Please change your TTS service to Azure or disable reflowing translated subtitles.")
-    elif cloudConfig.batch_tts_synthesize == False:
-        raise ValueError(f"\n\nERROR: Reflowing translated subtitles requires batch TTS synthesis to be enabled with Azure. Please enable batch TTS synthesis in cloud_service_settings.ini or disable reflowing translated subtitles.")
+    if cloudConfig.tts_service != TTSService.AZURE and cloudConfig.tts_service != TTSService.ELEVENLABS:
+        raise ValueError(f"\n\nERROR: Reflowing translated subtitles is currently only supported with Azure TTS (using batch mode) and ElevenLabs. Please change your TTS service or disable reflowing translated subtitles.")
+    elif cloudConfig.tts_service == TTSService.AZURE and cloudConfig.batch_tts_synthesize == False:
+        raise ValueError(f"\n\nERROR: Reflowing translated subtitles with Azure requires batch TTS synthesis to be enabled. Please enable batch TTS synthesis in cloud_service_settings.ini or disable reflowing translated subtitles.")
 
 # ----- Create constants ------
 ORIGINAL_VIDEO_PATH = batchConfig['SETTINGS']['original_video_file_path']

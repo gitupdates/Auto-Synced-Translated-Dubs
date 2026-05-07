@@ -21,6 +21,7 @@ import Scripts.auth as auth
 auth.authenticate_required_services() #Might not be necessary to do right after import but just in case
 import Scripts.azure_batch as azure_batch
 import Scripts.utils as utils
+import Scripts.segmentation as segmentation
 
 # Get variables from config
 
@@ -193,32 +194,28 @@ def synthesize_text_google(text:str, speedFactor:float, voiceName:str, voiceGend
         
     return decoded_audio
 
-async def synthesize_text_elevenlabs_async_http(text:str, voiceID:str, modelID:str, apiKey:str=ELEVENLABS_API_KEY) -> Optional[bytes]:
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voiceID}"
+async def synthesize_text_elevenlabs_async_http(text:str, voiceID:str, modelID:str, apiKey:str=ELEVENLABS_API_KEY) -> Optional[EL_TimedSpeechResponse]:
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voiceID}/with-timestamps"
     headers = {
-        "Accept": "audio/mpeg",
+        "Accept": "application/json",
         "Content-Type": "application/json",
         "xi-api-key": apiKey
     }
     data = {
         "text": text,
         "model_id": modelID,
+        "apply_text_normalization": "off"
         # "voice_settings": {
         #     "stability": 0.5,
         #     "similarity_boost": 0.5
         # }
     }
-    
-    audio_bytes:bytes = b''  # Initialize an empty bytes object
 
     async with aiohttp.ClientSession() as session:
         async with session.post(url, json=data, headers=headers) as response:
             if response.status == 200:
-                while True:
-                    chunk = await response.content.read(1024)
-                    if not chunk:
-                        break
-                    audio_bytes += chunk
+                response_data: EL_TimedSpeechResponse = await response.json()
+                return response_data
             else:
                 try:
                     error_message = await response.text()
@@ -243,8 +240,6 @@ async def synthesize_text_elevenlabs_async_http(text:str, voiceID:str, modelID:s
                 except Exception as ex:
                     print(f"ElevenLabs API error occurred.\n")
                 return None
-
-    return audio_bytes
 
 def synthesize_text_azure(text:str, duration:str|int|float, voiceName:str, languageCode:str, style:str) -> speechsdk.AudioDataStream:
 
@@ -564,17 +559,24 @@ async def synthesize_dictionary_async(subsDict:SubtitleDict, langDict:dict[LangD
 
         # Use this to set max concurrent jobs
         async with semaphore:
-            audio = await synthesize_text_elevenlabs_async_http(
+            response_data = await synthesize_text_elevenlabs_async_http(
                 value.translated_text, 
                 langDict[LangDictKeys.voiceName], 
                 langDict[LangDictKeys.voiceModel]
             )
 
-            if audio:
+            if response_data:
                 filePath = os.path.join('workingFolder', f'{str(key)}.mp3')
                 with open(filePath, "wb") as out:
-                    out.write(audio)
+                    out.write(base64.b64decode(response_data['audio_base64']))
                 subsDict[key].TTS_FilePath = filePath
+                subsDict[key].TTS_Word_Boundaries = segmentation.elevenlabs_charTiming_to_words(response_data["alignment"])
+                # If debugging, save the elevenlabs response data (minus the base64 data)
+                if config.debug_mode:
+                    debugResponseData = {k: v for k, v in response_data.items() if k != 'audio_base64'}
+                    debugFilePath = os.path.join('workingFolder', f'{str(key)}_elevenlabs_response.json')
+                    with open(debugFilePath, "w", encoding='utf-8') as f:
+                        json.dump(debugResponseData, f, ensure_ascii=False, indent=4)
             else:
                 nonlocal errorsOccured
                 errorsOccured = True

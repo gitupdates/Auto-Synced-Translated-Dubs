@@ -426,8 +426,9 @@ def process_language(langData:dict[str, str], processedCount:int, totalLanguages
     # Dump final subsDict to file if in debug mode
     if config.debug_mode:
         try:
-            with open(os.path.join('workingFolder', f'subsDictFinal_{langDict[LangDictKeys.languageCode]}.json'), 'w', encoding='utf-8') as f:
-                json.dump(individualLanguageSubsDict, f, ensure_ascii=False, indent=4)
+            import dataclasses
+            with open(os.path.join(OUTPUT_FOLDER, f'subsDictFinal_{langDict[LangDictKeys.languageCode]}.json'), 'w', encoding='utf-8') as f:
+                json.dump({k: dataclasses.asdict(v) for k, v in individualLanguageSubsDict.items()}, f, ensure_ascii=False, indent=4)
         except Exception as ex:
             print(f"Error writing subsDict to json file for debugging: {str(ex)}")
             input("Press Enter to continue...")

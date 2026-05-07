@@ -7,6 +7,44 @@ from Scripts.shared_imports import *
 from typing import Optional, cast
 import pathlib
 
+def elevenlabs_charTiming_to_words(alignmentObj:EL_alignment) -> list[Boundary]:
+    characters = alignmentObj["characters"]
+    starts = alignmentObj["character_start_times_seconds"]
+    ends = alignmentObj["character_end_times_seconds"]
+
+    boundaries: list[Boundary] = []
+    word_chars: list[str] = []
+    word_start_s: float = 0.0
+    word_end_s: float = 0.0
+
+    for char, start_s, end_s in zip(characters, starts, ends):
+        # If found a space, merge accumulated characters to a word boundary object
+        if char == " ":
+            if word_chars:
+                boundaries.append({
+                    "Text": "".join(word_chars),
+                    "AudioOffset": int(word_start_s * 1000),
+                    "Duration": int((word_end_s - word_start_s) * 1000),
+                })
+                word_chars = []
+        # Accumulate characters until a word boundary (space) is found
+        else:
+            # If there's no chars yet, so it's the first char, set it as the start
+            if not word_chars:
+                word_start_s = start_s
+            word_chars.append(char)
+            word_end_s = end_s # Continuously update the last end
+
+    if word_chars:
+        boundaries.append({
+            "Text": "".join(word_chars),
+            "AudioOffset": int(word_start_s * 1000),
+            "Duration": int((word_end_s - word_start_s) * 1000),
+        })
+
+    return boundaries
+
+
 def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutputFile:Optional[bool]=True, outFilePath:Optional[str]=None) -> tuple[str, str]|None:
     # Wordboundary / sentence boundary object contains list of objects looking like the below. We will use this info to create a new subtitle file such that it syncs with the audio.
         #   {
@@ -17,7 +55,8 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
 
     # Determine output path
     if outFilePath is None:
-        output_path = pathlib.Path(ORIGINAL_VIDEO_PATH).stem + f" - {langName} - {langCode}.srt"
+        outFileName:str = pathlib.Path(ORIGINAL_VIDEO_PATH).stem + f" - {langName} - {langCode}.srt"
+        output_path = os.path.join(OUTPUT_FOLDER, outFileName)
     else:
         output_path = outFilePath
 
@@ -48,9 +87,9 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
         for boundary in word_boundaries:
             b_text = boundary["Text"]
             # Clamp to minimum of zero. We actually need to use the 'max' method because python is stupid.
-            adjusted_boundary_start_ms = max(0, segment_start_ms + int(float(boundary["AudioOffset"] - trimmed_amount_ms) * speed_factor))
+            adjusted_boundary_start_ms = max(0, segment_start_ms + int(float(boundary["AudioOffset"] - trimmed_amount_ms) / speed_factor))
             b_start = adjusted_boundary_start_ms
-            b_dur = int(float(boundary["Duration"]) * speed_factor)
+            b_dur = int(float(boundary["Duration"]) / speed_factor)
 
             idx = full_text.find(b_text, current_pos)
             

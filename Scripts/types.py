@@ -34,6 +34,17 @@ class Boundary(typing.TypedDict):
     AudioOffset: int
     Duration: int
 
+# Elevenlabs Alignment object type within response for timed text to speech
+class EL_alignment(typing.TypedDict):
+    characters: list[str]
+    character_start_times_seconds: list[float]
+    character_end_times_seconds: list[float]
+
+# Response for timed text to speech request
+class EL_TimedSpeechResponse(typing.TypedDict):
+    audio_base64: str
+    alignment: EL_alignment
+    normalized_alignment: EL_alignment
 
 @dataclass
 class SubtitleEntry:
