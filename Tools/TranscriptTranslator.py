@@ -93,7 +93,7 @@ def process_language(langData, processedCount, totalLanguages):
     transcriptChunkedList:list[str] = translate.split_transcript_chunks(transcript, 5000)
 
     # Need to convert the list of chunks into a compatible dictionary to be used with 'translate_dictionary' function
-    convertedDict:dict[str, dict[str, str|int]] = translate.convertChunkListToCompatibleDict(transcriptChunkedList)
+    convertedDict: dict[str, SubtitleEntry] = translate.convertChunkListToCompatibleDict(transcriptChunkedList)
 
     # Translate the dictionary text, while processing with custom rules
     translatedDict = translate.translate_dictionary(convertedDict, langDict, transcriptMode=True)
@@ -101,7 +101,7 @@ def process_language(langData, processedCount, totalLanguages):
     # Convert dictionary back to transcript string
     translatedChunkList = []
     for key, value in translatedDict.items():
-        translatedChunkList.append(value[SubsDictKeys.translated_text])
+        translatedChunkList.append(value.translated_text)
         
     translatedTranscript = " ".join(translatedChunkList)
 

@@ -13,7 +13,8 @@ from urllib.request import urlopen
 import aiohttp
 import asyncio
 import html
-from typing import Optional, Any, Dict, cast
+import dataclasses
+from typing import Optional, Any, Dict
 
 from Scripts.shared_imports import *
 import Scripts.auth as auth
@@ -326,8 +327,8 @@ def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKey
         payload:dict = {}
 
         for key, value in tempDict.items():
-            text = tempDict[key][SubsDictKeys.translated_text]
-            duration = tempDict[key][SubsDictKeys.duration_ms_buffered]
+            text = tempDict[key].translated_text
+            duration = tempDict[key].duration_ms_buffered
             language = langDict[LangDictKeys.languageCode]
             voice = langDict[LangDictKeys.voiceName]
             style = langDict[LangDictKeys.voiceStyle]
@@ -509,7 +510,7 @@ def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKey
                         #file.filename = file.filename.lstrip('0')
 
                         # Add file path to subsDict then remove from remainingDownloadedEntriesList
-                        subsDict[currentFileNum][SubsDictKeys.TTS_FilePath] = os.path.join('workingFolder', str(currentFileNum)) + '.mp3'
+                        subsDict[currentFileNum].TTS_FilePath = os.path.join('workingFolder', str(currentFileNum)) + '.mp3'
                         # Extract file
                         zipdata.extract(file, 'workingFolder')
                         # Remove entry from remainingDownloadedEntriesList
@@ -519,9 +520,9 @@ def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKey
                         boundaries:list[Boundary] = json.load(zipdata.open(file)) # Open the file and store the boundaries dictionaries
                         zipdata.extract(file, 'workingFolder')
                         if "word" in file.filename:
-                            subsDict[currentFileNum][SubsDictKeys.TTS_Word_Boundaries] = boundaries
+                            subsDict[currentFileNum].TTS_Word_Boundaries = boundaries
                         elif "sentence" in file.filename:
-                            subsDict[currentFileNum][SubsDictKeys.TTS_Sentence_Boundaries] = boundaries
+                            subsDict[currentFileNum].TTS_Sentence_Boundaries = boundaries
         
         # Dump the current full subsDict to the working folder as json
         if config.debug_mode:
@@ -532,7 +533,7 @@ def synthesize_text_azure_batch(subsDict:SubtitleDict, langDict:Dict[LangDictKey
                 
             try:
                 with open(os.path.join('workingFolder', debugFileName), 'w', encoding='utf-8') as f:
-                    json.dump(subsDict, f, ensure_ascii=False, indent=4)
+                    json.dump({k: dataclasses.asdict(v) for k, v in subsDict.items()}, f, ensure_ascii=False, indent=4)
             except Exception as ex:
                 print(f"Error writing subsDict to json file for debugging: {str(ex)}")
                 input("Press Enter to continue...")
@@ -564,7 +565,7 @@ async def synthesize_dictionary_async(subsDict:SubtitleDict, langDict:dict[LangD
         # Use this to set max concurrent jobs
         async with semaphore:
             audio = await synthesize_text_elevenlabs_async_http(
-                value[SubsDictKeys.translated_text], 
+                value.translated_text, 
                 langDict[LangDictKeys.voiceName], 
                 langDict[LangDictKeys.voiceModel]
             )
@@ -573,11 +574,11 @@ async def synthesize_dictionary_async(subsDict:SubtitleDict, langDict:dict[LangD
                 filePath = os.path.join('workingFolder', f'{str(key)}.mp3')
                 with open(filePath, "wb") as out:
                     out.write(audio)
-                subsDict[key][SubsDictKeys.TTS_FilePath] = filePath
+                subsDict[key].TTS_FilePath = filePath
             else:
                 nonlocal errorsOccured
                 errorsOccured = True
-                subsDict[key][SubsDictKeys.TTS_FilePath] = "Failed"
+                subsDict[key].TTS_FilePath = "Failed"
 
         # Update and display progress after task completion
         async with lock:
@@ -611,11 +612,11 @@ def synthesize_dictionary(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any
         filePathStem = os.path.join('workingFolder', f'{str(key)}')
         if not skipSynthesize:
 
-            duration = value[SubsDictKeys.duration_ms_buffered]
+            duration = value.duration_ms_buffered
 
             if secondPass:
                 # Get speed factor from subsDict
-                speedFactor = cast(float, subsDict[key][SubsDictKeys.speed_factor])
+                speedFactor = subsDict[key].speed_factor
             else:
                 speedFactor = float(1.0)
 
@@ -628,7 +629,7 @@ def synthesize_dictionary(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any
 
             # If Google TTS, use Google API
             if cloudConfig.tts_service == TTSService.GOOGLE:
-                audio = synthesize_text_google(cast(str, value[SubsDictKeys.translated_text]), speedFactor, langDict[LangDictKeys.voiceName], langDict[LangDictKeys.voiceGender], langDict[LangDictKeys.languageCode])
+                audio = synthesize_text_google(value.translated_text, speedFactor, langDict[LangDictKeys.voiceName], langDict[LangDictKeys.voiceGender], langDict[LangDictKeys.languageCode])
                 with open(filePath, "wb") as out:
                     out.write(audio)
                 
@@ -643,7 +644,7 @@ def synthesize_dictionary(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any
             # If Azure TTS, use Azure API
             elif cloudConfig.tts_service == TTSService.AZURE:
                 # Audio variable is an AudioDataStream object
-                audio = synthesize_text_azure(cast(str, value[SubsDictKeys.translated_text]), duration, langDict[LangDictKeys.voiceName], langDict[LangDictKeys.languageCode], langDict[LangDictKeys.voiceStyle])
+                audio = synthesize_text_azure(value.translated_text, duration, langDict[LangDictKeys.voiceName], langDict[LangDictKeys.languageCode], langDict[LangDictKeys.voiceStyle])
                 # Save to file using save_to_wav_file method of audio object
                 audio.save_to_wav_file(filePath)
                 
@@ -653,7 +654,7 @@ def synthesize_dictionary(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any
                 if config.debug_mode and secondPass == True:
                     audio.save_to_wav_file(filePathStem+"_pass2.mp3")
 
-        subsDict[key][SubsDictKeys.TTS_FilePath] = filePath
+        subsDict[key].TTS_FilePath = filePath
 
         # Get key index
         keyIndex = list(subsDict.keys()).index(key)

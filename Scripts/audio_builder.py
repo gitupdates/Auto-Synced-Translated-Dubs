@@ -56,7 +56,7 @@ def get_speed_factor(subsDict, trimmedAudio, desiredDuration, num):
     # Calculate the speed factor, put into dictionary
     desiredDuration = float(desiredDuration)
     speedFactor = (rawDuration*1000) / desiredDuration
-    subsDict[num][SubsDictKeys.speed_factor] = speedFactor
+    subsDict[num].speed_factor = speedFactor
     return subsDict
 
 def stretch_with_rubberband(y, sampleRate, speedFactor):
@@ -127,23 +127,23 @@ def build_audio(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], totalAu
     # First trim silence off the audio files
     for key, value in subsDict.items():
         filePathTrimmed = os.path.join(workingFolder,  str(key)) + "_trimmed.wav"
-        subsDict[key][SubsDictKeys.TTS_FilePath_Trimmed] = filePathTrimmed
+        subsDict[key].TTS_FilePath_Trimmed = filePathTrimmed
 
         # Trim the clip and re-write file
         try:
-            rawClip = AudioSegment.from_file(value[SubsDictKeys.TTS_FilePath], format="mp3")
+            rawClip = AudioSegment.from_file(value.TTS_FilePath, format="mp3")
         except KeyError:
             print("\nERROR: An expected file was not found. This is likely because the TTS service failed to synthesize the audio. Refer to any error messages above.")
             sys.exit()
         except FileNotFoundError:
-            if value[SubsDictKeys.TTS_FilePath] == "Failed":
+            if value.TTS_FilePath == "Failed":
                 print("\nProgram failed because some audio was not synthesized. Refer to any error messages above.")
             else:
                 print("\nERROR: An expected file was not found. This is likely because the TTS service failed to synthesize the audio. Refer to any error messages above.")
             sys.exit()
         trimmedClip, _start_trim, _end_trim = trim_clip(rawClip)
-        subsDict[key][SubsDictKeys.start_trimmed_ms] = _start_trim
-        subsDict[key][SubsDictKeys.end_trimmed_ms] = _end_trim
+        subsDict[key].start_trimmed_ms = _start_trim
+        subsDict[key].end_trimmed_ms = _end_trim
         
         if config.debug_mode:
             trimmedClip.export(filePathTrimmed, format="wav")
@@ -161,7 +161,7 @@ def build_audio(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], totalAu
         # Calculate speed factors for each clip, aka how much to stretch the audio
         for key, value in subsDict.items():
             #subsDict = get_speed_factor(subsDict, value[SubsDictKeys.TTS_FilePath_Trimmed], value[SubsDictKeys.duration_ms], num=key)
-            subsDict = get_speed_factor(subsDict, virtualTrimmedFileDict[key], value[SubsDictKeys.duration_ms], num=key)
+            subsDict = get_speed_factor(subsDict, virtualTrimmedFileDict[key], value.duration_ms, num=key)
             keyIndex = list(subsDict.keys()).index(key)
             print(f" Calculated Speed Factor: {keyIndex+1} of {len(subsDict)}", end="\r")
         print("\n")
@@ -184,14 +184,14 @@ def build_audio(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], totalAu
             
         for key, value in subsDict.items():
             # Trim the clip and re-write file
-            rawClip = AudioSegment.from_file(value[SubsDictKeys.TTS_FilePath], format="mp3")
+            rawClip = AudioSegment.from_file(value.TTS_FilePath, format="mp3")
             trimmedClip, _start_trim, _end_trim = trim_clip(rawClip)
             # Update the trimmed amounts
-            subsDict[key][SubsDictKeys.start_trimmed_ms] = _start_trim
-            subsDict[key][SubsDictKeys.end_trimmed_ms] = _end_trim
+            subsDict[key].start_trimmed_ms = _start_trim
+            subsDict[key].end_trimmed_ms = _end_trim
             if config.debug_mode:
                 # Remove '.wav' from the end of the file path
-                secondPassTrimmedFile = str(value[SubsDictKeys.TTS_FilePath_Trimmed])[:-4] + "_p2_trimmed.wav"
+                secondPassTrimmedFile = str(value.TTS_FilePath_Trimmed)[:-4] + "_p2_trimmed.wav"
                 trimmedClip.export(secondPassTrimmedFile, format="wav")
             trimmedClip.export(virtualTrimmedFileDict[key], format="wav")
             keyIndex = list(subsDict.keys()).index(key)
@@ -200,7 +200,7 @@ def build_audio(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], totalAu
 
         if config.force_stretch_with_twopass == True:
             for key, value in subsDict.items():
-                subsDict = get_speed_factor(subsDict, virtualTrimmedFileDict[key], value[SubsDictKeys.duration_ms], num=key)
+                subsDict = get_speed_factor(subsDict, virtualTrimmedFileDict[key], value.duration_ms, num=key)
                 keyIndex = list(subsDict.keys()).index(key)
                 print(f" Calculated Speed Factor (2nd Pass): {keyIndex+1} of {len(subsDict)}", end="\r")
             print("\n")
@@ -212,21 +212,21 @@ def build_audio(subsDict:SubtitleDict, langDict:dict[LangDictKeys, Any], totalAu
     for key, value in subsDict.items():
         if ((not twoPassVoiceSynth or config.force_stretch_with_twopass == True) and (cloudConfig.tts_service not in servicesSupportingExactDuration)) or config.force_always_stretch == True: # Don't stretch if azure is used unless forced
             #stretchedClip = stretch_audio_clip(value[SubsDictKeys.TTS_FilePath_Trimmed], speedFactor=subsDict[key][SubsDictKeys.speed_factor], num=key)
-            stretchedClip = stretch_audio_clip(virtualTrimmedFileDict[key], speedFactor=subsDict[key][SubsDictKeys.speed_factor], num=key)
+            stretchedClip = stretch_audio_clip(virtualTrimmedFileDict[key], speedFactor=subsDict[key].speed_factor, num=key)
         else:
             #stretchedClip = AudioSegment.from_file(value[SubsDictKeys.TTS_FilePath_Trimmed], format="wav")
             stretchedClip = AudioSegment.from_file(virtualTrimmedFileDict[key], format="wav")
             virtualTrimmedFileDict[key].seek(0) # Not 100% sure if this is necessary but it was in the other place it is used
 
-        canvas = insert_audio(canvas, stretchedClip, value[SubsDictKeys.start_ms])
+        canvas = insert_audio(canvas, stretchedClip, value.start_ms)
         
         # Print warning if audio clip is longer than expected and would overlap next clip
-        currentClipExpectedDuration = int(value[SubsDictKeys.duration_ms])
+        currentClipExpectedDuration = int(value.duration_ms)
         currentClipTrueDuration = stretchedClip.duration_seconds * 1000
         difference = str(round(currentClipTrueDuration - currentClipExpectedDuration))
-        if key < len(subsDict) and (currentClipTrueDuration + int(value[SubsDictKeys.start_ms]) > int(subsDict[key+1][SubsDictKeys.start_ms])):
+        if key < len(subsDict) and (currentClipTrueDuration + int(value.start_ms) > int(subsDict[key+1].start_ms)):
             print(f"WARNING: Audio clip {str(key)} for language {langDict[LangDictKeys.languageCode]} is {difference}ms longer than expected and may overlap the next clip. Inspect the audio file after completion.")
-        elif key == len(subsDict) and (currentClipTrueDuration + int(value[SubsDictKeys.start_ms]) > totalAudioLength):
+        elif key == len(subsDict) and (currentClipTrueDuration + int(value.start_ms) > totalAudioLength):
             print(f"WARNING: Audio clip {str(key)} for language {langDict[LangDictKeys.languageCode]} is {difference}ms longer than expected and may cut off at the end of the file. Inspect the audio file after completion.")
             
             

@@ -128,8 +128,8 @@ def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> Subt
                 else:
                     break
 
-            # Create empty dictionary with keys for start and end times and subtitle text
-            subsDict[line] = {SubsDictKeys.start_ms: '', SubsDictKeys.end_ms: '', SubsDictKeys.duration_ms: '', SubsDictKeys.text: '', SubsDictKeys.break_until_next: '', SubsDictKeys.srt_timestamps_line: lineWithTimestamps}
+            # Create entry for this subtitle line
+            subsDict[line] = SubtitleEntry(srt_timestamps_line=lineWithTimestamps)
 
             time = lineWithTimestamps.split(' --> ')
             time1 = time[0].split(':')
@@ -142,31 +142,31 @@ def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> Subt
 
             # Adjust times with buffer
             if addBufferMilliseconds > 0 and not preTranslated:
-                subsDict[line][SubsDictKeys.start_ms_buffered] = str(processedTime1 + addBufferMilliseconds)
-                subsDict[line][SubsDictKeys.end_ms_buffered] = str(processedTime2 - addBufferMilliseconds)
-                subsDict[line][SubsDictKeys.duration_ms_buffered] = str((processedTime2 - addBufferMilliseconds) - (processedTime1 + addBufferMilliseconds))
+                subsDict[line].start_ms_buffered = str(processedTime1 + addBufferMilliseconds)
+                subsDict[line].end_ms_buffered = str(processedTime2 - addBufferMilliseconds)
+                subsDict[line].duration_ms_buffered = str((processedTime2 - addBufferMilliseconds) - (processedTime1 + addBufferMilliseconds))
             else:
-                subsDict[line][SubsDictKeys.start_ms_buffered] = str(processedTime1)
-                subsDict[line][SubsDictKeys.end_ms_buffered] = str(processedTime2)
-                subsDict[line][SubsDictKeys.duration_ms_buffered] = str(processedTime2 - processedTime1)
+                subsDict[line].start_ms_buffered = str(processedTime1)
+                subsDict[line].end_ms_buffered = str(processedTime2)
+                subsDict[line].duration_ms_buffered = str(processedTime2 - processedTime1)
             
             # Set the keys in the dictionary to the values
-            subsDict[line][SubsDictKeys.start_ms] = str(processedTime1)
-            subsDict[line][SubsDictKeys.end_ms] = str(processedTime2)
-            subsDict[line][SubsDictKeys.duration_ms] = timeDifferenceMs
-            subsDict[line][SubsDictKeys.text] = lineWithSubtitleText
+            subsDict[line].start_ms = str(processedTime1)
+            subsDict[line].end_ms = str(processedTime2)
+            subsDict[line].duration_ms = timeDifferenceMs
+            subsDict[line].text = lineWithSubtitleText
             if lineNum > 0:
                 # Goes back to previous line's dictionary and writes difference in time to current line
-                subsDict[line-1][SubsDictKeys.break_until_next] = processedTime1 - int(subsDict[line - 1][SubsDictKeys.end_ms])
+                subsDict[line-1].break_until_next = processedTime1 - int(subsDict[line - 1].end_ms)
             else:
-                subsDict[line][SubsDictKeys.break_until_next] = 0
+                subsDict[line].break_until_next = 0
 
     # Apply the buffer to the start and end times by setting copying over the buffer values to main values
     if addBufferMilliseconds > 0 and not preTranslated:
         for key, value in subsDict.items():
-            subsDict[key][SubsDictKeys.start_ms] = value[SubsDictKeys.start_ms_buffered]
-            subsDict[key][SubsDictKeys.end_ms] = value[SubsDictKeys.end_ms_buffered]
-            subsDict[key][SubsDictKeys.duration_ms] = value[SubsDictKeys.duration_ms_buffered]
+            subsDict[key].start_ms = value.start_ms_buffered
+            subsDict[key].end_ms = value.end_ms_buffered
+            subsDict[key].duration_ms = value.duration_ms_buffered
 
     return subsDict
 
@@ -203,7 +203,7 @@ def get_duration(filename:str) -> int:
 # Get the duration of the original video file
 if config.debug_mode and ORIGINAL_VIDEO_PATH.lower() == "debug.test":
     # Copy the duration based on the last timestamp of the subtitles
-    totalAudioLength:int = int(originalLanguageSubsDict[str(len(originalLanguageSubsDict))][SubsDictKeys.end_ms])
+    totalAudioLength:int = int(originalLanguageSubsDict[len(originalLanguageSubsDict)].end_ms)
 else:
     totalAudioLength:int = get_duration(ORIGINAL_VIDEO_PATH)
 
@@ -226,7 +226,7 @@ def manually_prepare_dictionary(dictionaryToPrep: SubtitleDict) -> SubtitleDict:
     ### Do additional Processing to match the format produced by translation function
     # Create new key 'translated_text' and set it to the value of 'text'
     for key, value in dictionaryToPrep.items():
-        dictionaryToPrep[key][SubsDictKeys.translated_text] = value[SubsDictKeys.text]
+        dictionaryToPrep[key].translated_text = value.text
     
     # Convert the keys to integers and return the dictionary
     return {int(k): v for k, v in dictionaryToPrep.items()}
@@ -297,20 +297,20 @@ def make_dictionary_using_custom_timing(languageCode:str) -> SubtitleDict:
                     duration_ms_buffered = str(int(end_ms_buffered) - int(start_ms_buffered))
 
                     # Create entry in dictionary
-                    customSubsDict[lineNum + 1] = {
-                        SubsDictKeys.start_ms: str(processedTime1),
-                        SubsDictKeys.end_ms: str(processedTime2),
-                        SubsDictKeys.duration_ms: timeDifferenceMs,
-                        SubsDictKeys.text: subtitleText,
-                        SubsDictKeys.translated_text: subtitleText,
-                        SubsDictKeys.srt_timestamps_line: f"{startTimecode} --> {endTimecode}",
-                        SubsDictKeys.break_until_next: '0',  # Will adjust later,
-                        SubsDictKeys.start_ms_buffered: start_ms_buffered,
-                        SubsDictKeys.end_ms_buffered: end_ms_buffered,
-                        SubsDictKeys.duration_ms_buffered: duration_ms_buffered,
-                        SubsDictKeys.force_split_at_start: isForceSplitStart,
-                        SubsDictKeys.force_split_at_end: isForceSplitEnd
-                    }
+                    customSubsDict[lineNum + 1] = SubtitleEntry(
+                        start_ms=str(processedTime1),
+                        end_ms=str(processedTime2),
+                        duration_ms=timeDifferenceMs,
+                        text=subtitleText,
+                        translated_text=subtitleText,
+                        srt_timestamps_line=f"{startTimecode} --> {endTimecode}",
+                        break_until_next=0,
+                        start_ms_buffered=start_ms_buffered,
+                        end_ms_buffered=end_ms_buffered,
+                        duration_ms_buffered=duration_ms_buffered,
+                        force_split_at_start=isForceSplitStart,
+                        force_split_at_end=isForceSplitEnd
+                    )
                     
                     previousStartMs = processedTime1
                     previousEndMs = processedTime2

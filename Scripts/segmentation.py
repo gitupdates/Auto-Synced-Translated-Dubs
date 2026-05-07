@@ -31,17 +31,17 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
 
     for id, segment in sorted_segments:
         # Try to get the TTS_Word_Boundaries key in the object
-        word_boundaries = cast(list[Boundary], segment.get(SubsDictKeys.TTS_Word_Boundaries, []))
+        word_boundaries = segment.TTS_Word_Boundaries
 
         # If they exist, add the segment's start time to the offsets and add them to the all_boundaries list
-        segment_start_ms = int(cast(str | int | float, segment[SubsDictKeys.start_ms_buffered]))
+        segment_start_ms = int(segment.start_ms_buffered)
         
         # Speed factor affects the duration and audio offset
-        speed_factor:float = cast(float, segment.get(SubsDictKeys.speed_factor, 1.0))
+        speed_factor:float = segment.speed_factor
         # Trimmed amount from the original audio affects the audio offset
-        trimmed_amount_ms:int = cast(int, segment.get(SubsDictKeys.start_trimmed_ms, 0))
+        trimmed_amount_ms:int = segment.start_trimmed_ms
         
-        full_text = str(segment.get("translated_text") or segment.get("text", ""))
+        full_text = str(segment.translated_text or segment.text)
         current_pos = 0
         segment_boundaries: list[dict] = []
 
@@ -102,7 +102,7 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
                 segment_boundaries[-1]["text"] += " " + trailing_text
             else:
                 # If there were no valid boundaries at all but there is text, create a fallback token
-                segment_dur = int(cast(str | int | float, segment.get("duration_ms", 0)))
+                segment_dur = int(segment.duration_ms) if segment.duration_ms else 0
                 segment_boundaries.append({
                     "text": trailing_text,
                     "start_ms": segment_start_ms,
@@ -281,7 +281,7 @@ def reflow_subtitles(subsDict: SubtitleDict, langCode:str, langName:str, doOutpu
     # Determine the original full transcript to compare and ensure it's identical, if not warn the user
     originalFullTranscript:str = ""
     for i, obj in subsDict.items():
-        currSegmentText:str = f"{obj['translated_text']} "
+        currSegmentText:str = f"{obj.translated_text} "
         originalFullTranscript += currSegmentText
 
     if originalFullTranscript.strip() != reflowed_transcript.strip():
