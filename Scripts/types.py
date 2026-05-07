@@ -42,7 +42,6 @@ SubtitleEntry = dict[str, str | int | float | list[Boundary]]
 
 # Dictionary types for different key types
 # Keys can be either str (line numbers as strings) or int (after conversion)
-SubtitleDictStr = dict[str, SubtitleEntry]  # String keys (line numbers as strings like "1", "2", etc.)
 SubtitleDict = dict[int, SubtitleEntry]  # Integer keys (after conversion to int)
 
 """

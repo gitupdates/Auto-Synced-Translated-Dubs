@@ -97,12 +97,12 @@ for num in languageNums:
 
 #======================================== Parse SRT File ================================================
 
-def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> SubtitleDictStr:
+def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> SubtitleDict:
     # Matches the following example with regex:    00:00:20,130 --> 00:00:23,419
     subtitleTimeLineRegex = re.compile(r'\d\d:\d\d:\d\d,\d\d\d --> \d\d:\d\d:\d\d,\d\d\d')
 
     # Create a dictionary
-    subsDict: SubtitleDictStr = {}
+    subsDict: SubtitleDict = {}
 
     # Will add this many milliseconds of extra silence before and after each audio clip / spoken subtitle line
     addBufferMilliseconds = int(config.add_line_buffer_milliseconds)
@@ -111,9 +111,10 @@ def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> Subt
     # The dictionary contains the start, ending, and duration of the subtitles as well as the text
     # The next line uses the syntax HH:MM:SS,MMM --> HH:MM:SS,MMM . Get the difference between the two times and put that in the dictionary
     # For the line after that, put the text in the dictionary
-    for lineNum, line in enumerate(srtFileLines):
-        line = line.strip()
-        if line.isdigit() and subtitleTimeLineRegex.match(srtFileLines[lineNum + 1]):
+    for lineNum, lineStr in enumerate(srtFileLines):
+        lineStr = lineStr.strip()
+        if lineStr.isdigit() and subtitleTimeLineRegex.match(srtFileLines[lineNum + 1]):
+            line:int = int(lineStr)
             lineWithTimestamps = srtFileLines[lineNum + 1].strip()
             lineWithSubtitleText = srtFileLines[lineNum + 2].strip()
 
@@ -156,7 +157,7 @@ def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> Subt
             subsDict[line][SubsDictKeys.text] = lineWithSubtitleText
             if lineNum > 0:
                 # Goes back to previous line's dictionary and writes difference in time to current line
-                subsDict[str(int(line)-1)][SubsDictKeys.break_until_next] = processedTime1 - int(subsDict[str(int(line) - 1)][SubsDictKeys.end_ms])
+                subsDict[line-1][SubsDictKeys.break_until_next] = processedTime1 - int(subsDict[line - 1][SubsDictKeys.end_ms])
             else:
                 subsDict[line][SubsDictKeys.break_until_next] = 0
 
@@ -175,7 +176,7 @@ def parse_srt_file(srtFileLines: list[str], preTranslated: bool = False) -> Subt
 try:
     with open(srtFile, 'r', encoding='utf-8-sig') as f:
         originalSubLines = f.readlines()
-        originalLanguageSubsDict: SubtitleDictStr = parse_srt_file(originalSubLines)
+        originalLanguageSubsDict: SubtitleDict = parse_srt_file(originalSubLines)
 except Exception as e:
     if config.skip_translation is True:
         # Just print a warning but we don't actually need the original SRT if not translating so continue anyway
@@ -221,7 +222,7 @@ if not os.path.exists('workingFolder'):
 
 #======================================== Translation and Text-To-Speech ================================================
 
-def manually_prepare_dictionary(dictionaryToPrep: SubtitleDictStr) -> SubtitleDict:
+def manually_prepare_dictionary(dictionaryToPrep: SubtitleDict) -> SubtitleDict:
     ### Do additional Processing to match the format produced by translation function
     # Create new key 'translated_text' and set it to the value of 'text'
     for key, value in dictionaryToPrep.items():
@@ -318,14 +319,6 @@ def make_dictionary_using_custom_timing(languageCode:str) -> SubtitleDict:
 
     return customSubsDict
 
-def convert_dict_string_keys_to_int(dictionaryToPrep:SubtitleDictStr) -> SubtitleDict:
-    
-    resultDict: SubtitleDict = {}
-    for key, value in dictionaryToPrep.items():
-        # Convert key to integer
-        resultDict[int(key)] = value
-    return resultDict
-
 def get_pretranslated_subs_dict(langData: dict[str, str]) -> SubtitleDict:
     # Get list of files in the output folder
     files = os.listdir(OUTPUT_FOLDER)
@@ -356,7 +349,7 @@ def get_pretranslated_subs_dict(langData: dict[str, str]) -> SubtitleDict:
             print(f"Pre-translated file found: {file}")
 
             # Parse the srt file using function
-            preTranslatedDict: SubtitleDictStr = parse_srt_file(pretranslatedSubLines, preTranslated=True)
+            preTranslatedDict: SubtitleDict = parse_srt_file(pretranslatedSubLines, preTranslated=True)
             
             # Convert the keys to integers
             preTranslatedDictInt: SubtitleDict = manually_prepare_dictionary(preTranslatedDict)
@@ -380,7 +373,7 @@ def process_language(langData:dict[str, str], processedCount:int, totalLanguages
         LangDictKeys.voiceStyle: langData[LangDataKeys.synth_voice_style]
     }
 
-    originalSubDictCopy: SubtitleDict = convert_dict_string_keys_to_int(copy.deepcopy(originalLanguageSubsDict))
+    originalSubDictCopy: SubtitleDict = copy.deepcopy(originalLanguageSubsDict)
     individualLanguageSubsDict: SubtitleDict = {}
     
     # Print language being processed

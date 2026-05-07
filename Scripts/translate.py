@@ -1035,7 +1035,7 @@ def combine_single_pass(entryListLocal:list[SubtitleEntry], charRateGoal:float, 
 #----------------------------------------------------------------------
 
 # Calculate the number of characters per second for each subtitle entry
-def calc_dict_speaking_rates(inputDict:SubtitleDictStr, dictKey:str=SubsDictKeys.translated_text):  
+def calc_dict_speaking_rates(inputDict:SubtitleDict, dictKey:str=SubsDictKeys.translated_text):  
     tempDict = copy.deepcopy(inputDict)
     for key, value in tempDict.items():
         tempDict[key][SubsDictKeys.char_rate] = round(len(str(value[dictKey])) / (int(value[SubsDictKeys.duration_ms]) / 1000), 2)
