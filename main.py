@@ -46,6 +46,20 @@ srtFile = os.path.abspath(batchConfig['SETTINGS']['srt_file_path'].strip("\""))
 # Get original video file path, also allow you to debug using a subtitle file without having the original video file
 videoFilePath = batchConfig['SETTINGS']['original_video_file_path']
 
+# First go through the languageNums and see if any are language codes instead of numbers. If so, replace it with the number by checking each section and comparing to translation_target_language value
+for i, lang in enumerate(languageNums):
+    if not lang.isdigit():
+        foundLangNum = None
+        for section in batchConfig.sections():
+            if section.startswith('LANGUAGE-') and batchConfig.has_option(section, 'translation_target_language'):
+                if batchConfig[section]['translation_target_language'].lower() == lang.lower():
+                    foundLangNum = section.split('LANGUAGE-')[1]
+                    break
+        if foundLangNum:
+            languageNums[i] = foundLangNum
+        else:
+            raise ValueError(f'Invalid language code in batch.ini: {lang} - Make sure the language code exists under a section like [LANGUAGE-X] with the option "translation_target_language" set to that code')
+
 # Validate the number of sections
 for num in languageNums:
     # Check if section exists
