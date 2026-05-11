@@ -245,14 +245,14 @@ def manually_prepare_dictionary(dictionaryToPrep: SubtitleDict) -> SubtitleDict:
     # Convert the keys to integers and return the dictionary
     return {int(k): v for k, v in dictionaryToPrep.items()}
 
-def make_dictionary_using_custom_timing(languageCode:str) -> SubtitleDict:
+def make_dictionary_using_custom_timing(languageCodeShort:str, languageCodeLong:str) -> SubtitleDict:
     # Need to parse and define the text, translated_text, duration
     customSubsDict: SubtitleDict = {}
 
     # Find the file in OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER that ends with f"_{languageCode}.txt"
     customTimingFilePath = None
     for file in os.listdir(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER):
-        if file.lower().endswith(f"_{languageCode.lower()}.txt"):
+        if file.lower().endswith(f"_{languageCodeLong.lower()}.txt") or file.lower().endswith(f"_{languageCodeShort.lower()}.txt"):
             customTimingFilePath = os.path.join(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER, file)
             break
     
@@ -402,10 +402,13 @@ def process_language(langData:dict[str, str], processedCount:int, totalLanguages
 
     # Check if the output folder has a custom timing folder, and if there's a file in there for the current language
     elif os.path.exists(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER) \
-        and any(f.lower().endswith(f"_{langDict[LangDictKeys.languageCode].lower()}.txt") for f in os.listdir(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER)) \
-        and config.prefer_custom_timing == True:
+        and config.prefer_custom_timing == True \
+        and (
+            any(f.lower().endswith(f"_{langDict[LangDictKeys.languageCode].lower()}.txt") for f in os.listdir(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER)) # Check for full code (de-DE etc)
+            or any(f.lower().endswith(f"_{langDict[LangDictKeys.targetLanguage].lower()}.txt") for f in os.listdir(OUTPUT_CUSTOM_SENTENCE_TIMING_FOLDER)) # Check for simple code (de)
+        ):
             print(f"Using custom sentence timing as preferred...")
-            customSentencesSubsDict = make_dictionary_using_custom_timing(langDict[LangDictKeys.languageCode])
+            customSentencesSubsDict = make_dictionary_using_custom_timing(langDict[LangDictKeys.targetLanguage], langDict[LangDictKeys.languageCode])
             individualLanguageSubsDict: SubtitleDict = translate.translate_dictionary(customSentencesSubsDict, langDict, skipTranslation=True)
             
     elif config.skip_translation == False:
